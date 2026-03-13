@@ -1,6 +1,6 @@
 """
-Zep实体读取与过滤服务
-从Zep图谱中读取节点，筛选出符合预定义实体类型的节点
+Dịch vụ đọc và lọc thực thể Zep
+Đọc các nút từ đồ thị Zep, lọc ra các nút phù hợp với loại thực thể được định nghĩa trước
 """
 
 import time
@@ -15,21 +15,21 @@ from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
 
 logger = get_logger('mirofish.zep_entity_reader')
 
-# 用于泛型返回类型
+# Dùng cho kiểu trả về generic
 T = TypeVar('T')
 
 
 @dataclass
 class EntityNode:
-    """实体节点数据结构"""
+    """Cấu trúc dữ liệu nút thực thể"""
     uuid: str
     name: str
     labels: List[str]
     summary: str
     attributes: Dict[str, Any]
-    # 相关的边信息
+    # Thông tin các cạnh liên quan
     related_edges: List[Dict[str, Any]] = field(default_factory=list)
-    # 相关的其他节点信息
+    # Thông tin các nút liên quan khác
     related_nodes: List[Dict[str, Any]] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -44,7 +44,7 @@ class EntityNode:
         }
     
     def get_entity_type(self) -> Optional[str]:
-        """获取实体类型（排除默认的Entity标签）"""
+        """Lấy loại thực thể (loại trừ nhãn mặc định Entity)"""
         for label in self.labels:
             if label not in ["Entity", "Node"]:
                 return label
@@ -53,7 +53,7 @@ class EntityNode:
 
 @dataclass
 class FilteredEntities:
-    """过滤后的实体集合"""
+    """Tập thực thể sau khi lọc"""
     entities: List[EntityNode]
     entity_types: Set[str]
     total_count: int
@@ -70,18 +70,18 @@ class FilteredEntities:
 
 class ZepEntityReader:
     """
-    Zep实体读取与过滤服务
+    Dịch vụ đọc và lọc thực thể Zep
     
-    主要功能：
-    1. 从Zep图谱读取所有节点
-    2. 筛选出符合预定义实体类型的节点（Labels不只是Entity的节点）
-    3. 获取每个实体的相关边和关联节点信息
+    Chức năng chính:
+    1. Đọc toàn bộ nút từ đồ thị Zep
+    2. Lọc ra các nút khớp loại thực thể được định nghĩa trước (Labels không chỉ có Entity)
+    3. Lấy thông tin cạnh liên quan và nút liên kết của từng thực thể
     """
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or Config.ZEP_API_KEY
         if not self.api_key:
-            raise ValueError("ZEP_API_KEY 未配置")
+            raise ValueError("ZEP_API_KEY chưa được cấu hình")
         
         self.client = Zep(api_key=self.api_key)
     
@@ -93,16 +93,16 @@ class ZepEntityReader:
         initial_delay: float = 2.0
     ) -> T:
         """
-        带重试机制的Zep API调用
+        Gọi Zep API kèm cơ chế thử lại
         
         Args:
-            func: 要执行的函数（无参数的lambda或callable）
-            operation_name: 操作名称，用于日志
-            max_retries: 最大重试次数（默认3次，即最多尝试3次）
-            initial_delay: 初始延迟秒数
+            func: Hàm cần thực thi (lambda hoặc callable không có tham số)
+            operation_name: Tên thao tác, dùng cho log
+            max_retries: Số lần thử lại tối đa (mặc định 3 lần)
+            initial_delay: Độ trễ ban đầu tính bằng giây
             
         Returns:
-            API调用结果
+            Kết quả gọi API
         """
         last_exception = None
         delay = initial_delay
@@ -114,27 +114,27 @@ class ZepEntityReader:
                 last_exception = e
                 if attempt < max_retries - 1:
                     logger.warning(
-                        f"Zep {operation_name} 第 {attempt + 1} 次尝试失败: {str(e)[:100]}, "
-                        f"{delay:.1f}秒后重试..."
+                        f"Zep {operation_name} lần thử {attempt + 1} thất bại: {str(e)[:100]}, "
+                        f"sẽ thử lại sau {delay:.1f} giây..."
                     )
                     time.sleep(delay)
-                    delay *= 2  # 指数退避
+                    delay *= 2  # Backoff theo cấp số nhân
                 else:
-                    logger.error(f"Zep {operation_name} 在 {max_retries} 次尝试后仍失败: {str(e)}")
+                    logger.error(f"Zep {operation_name} vẫn thất bại sau {max_retries} lần thử: {str(e)}")
         
         raise last_exception
     
     def get_all_nodes(self, graph_id: str) -> List[Dict[str, Any]]:
         """
-        获取图谱的所有节点（分页获取）
+        Lấy toàn bộ nút của đồ thị (có phân trang)
 
         Args:
-            graph_id: 图谱ID
+            graph_id: ID đồ thị
 
         Returns:
-            节点列表
+            Danh sách nút
         """
-        logger.info(f"获取图谱 {graph_id} 的所有节点...")
+        logger.info(f"Đang lấy toàn bộ nút của đồ thị {graph_id}...")
 
         nodes = fetch_all_nodes(self.client, graph_id)
 
@@ -148,20 +148,20 @@ class ZepEntityReader:
                 "attributes": node.attributes or {},
             })
 
-        logger.info(f"共获取 {len(nodes_data)} 个节点")
+        logger.info(f"Đã lấy {len(nodes_data)} nút")
         return nodes_data
 
     def get_all_edges(self, graph_id: str) -> List[Dict[str, Any]]:
         """
-        获取图谱的所有边（分页获取）
+        Lấy toàn bộ cạnh của đồ thị (có phân trang)
 
         Args:
-            graph_id: 图谱ID
+            graph_id: ID đồ thị
 
         Returns:
-            边列表
+            Danh sách cạnh
         """
-        logger.info(f"获取图谱 {graph_id} 的所有边...")
+        logger.info(f"Đang lấy toàn bộ cạnh của đồ thị {graph_id}...")
 
         edges = fetch_all_edges(self.client, graph_id)
 
@@ -176,24 +176,24 @@ class ZepEntityReader:
                 "attributes": edge.attributes or {},
             })
 
-        logger.info(f"共获取 {len(edges_data)} 条边")
+        logger.info(f"Đã lấy {len(edges_data)} cạnh")
         return edges_data
     
     def get_node_edges(self, node_uuid: str) -> List[Dict[str, Any]]:
         """
-        获取指定节点的所有相关边（带重试机制）
+        Lấy toàn bộ cạnh liên quan của một nút chỉ định (có cơ chế thử lại)
         
         Args:
-            node_uuid: 节点UUID
+            node_uuid: UUID của nút
             
         Returns:
-            边列表
+            Danh sách cạnh
         """
         try:
-            # 使用重试机制调用Zep API
+            # Dùng cơ chế thử lại để gọi Zep API
             edges = self._call_with_retry(
                 func=lambda: self.client.graph.node.get_entity_edges(node_uuid=node_uuid),
-                operation_name=f"获取节点边(node={node_uuid[:8]}...)"
+                operation_name=f"lấy cạnh của nút (node={node_uuid[:8]}...)"
             )
             
             edges_data = []
@@ -209,7 +209,7 @@ class ZepEntityReader:
             
             return edges_data
         except Exception as e:
-            logger.warning(f"获取节点 {node_uuid} 的边失败: {str(e)}")
+            logger.warning(f"Lấy cạnh của nút {node_uuid} thất bại: {str(e)}")
             return []
     
     def filter_defined_entities(
@@ -219,47 +219,47 @@ class ZepEntityReader:
         enrich_with_edges: bool = True
     ) -> FilteredEntities:
         """
-        筛选出符合预定义实体类型的节点
+        Lọc ra các nút phù hợp với loại thực thể được định nghĩa trước
         
-        筛选逻辑：
-        - 如果节点的Labels只有一个"Entity"，说明这个实体不符合我们预定义的类型，跳过
-        - 如果节点的Labels包含除"Entity"和"Node"之外的标签，说明符合预定义类型，保留
+        Logic lọc:
+        - Nếu Labels của nút chỉ có "Entity", nghĩa là thực thể này không khớp loại đã định nghĩa trước, bỏ qua
+        - Nếu Labels của nút chứa nhãn ngoài "Entity" và "Node", nghĩa là khớp loại đã định nghĩa trước, giữ lại
         
         Args:
-            graph_id: 图谱ID
-            defined_entity_types: 预定义的实体类型列表（可选，如果提供则只保留这些类型）
-            enrich_with_edges: 是否获取每个实体的相关边信息
+            graph_id: ID đồ thị
+            defined_entity_types: Danh sách loại thực thể định nghĩa trước (tùy chọn, nếu có thì chỉ giữ các loại này)
+            enrich_with_edges: Có lấy thông tin cạnh liên quan của từng thực thể hay không
             
         Returns:
-            FilteredEntities: 过滤后的实体集合
+            FilteredEntities: Tập thực thể sau khi lọc
         """
-        logger.info(f"开始筛选图谱 {graph_id} 的实体...")
+        logger.info(f"Bắt đầu lọc thực thể trong đồ thị {graph_id}...")
         
-        # 获取所有节点
+        # Lấy toàn bộ nút
         all_nodes = self.get_all_nodes(graph_id)
         total_count = len(all_nodes)
         
-        # 获取所有边（用于后续关联查找）
+        # Lấy toàn bộ cạnh để phục vụ tra cứu liên kết tiếp theo
         all_edges = self.get_all_edges(graph_id) if enrich_with_edges else []
         
-        # 构建节点UUID到节点数据的映射
+        # Tạo ánh xạ từ UUID nút sang dữ liệu nút
         node_map = {n["uuid"]: n for n in all_nodes}
         
-        # 筛选符合条件的实体
+        # Lọc các thực thể phù hợp
         filtered_entities = []
         entity_types_found = set()
         
         for node in all_nodes:
             labels = node.get("labels", [])
             
-            # 筛选逻辑：Labels必须包含除"Entity"和"Node"之外的标签
+            # Logic lọc: Labels phải có nhãn ngoài "Entity" và "Node"
             custom_labels = [l for l in labels if l not in ["Entity", "Node"]]
             
             if not custom_labels:
-                # 只有默认标签，跳过
+                # Chỉ có nhãn mặc định, bỏ qua
                 continue
             
-            # 如果指定了预定义类型，检查是否匹配
+            # Nếu đã chỉ định loại định nghĩa trước, kiểm tra xem có khớp không
             if defined_entity_types:
                 matching_labels = [l for l in custom_labels if l in defined_entity_types]
                 if not matching_labels:
@@ -270,7 +270,7 @@ class ZepEntityReader:
             
             entity_types_found.add(entity_type)
             
-            # 创建实体节点对象
+            # Tạo đối tượng nút thực thể
             entity = EntityNode(
                 uuid=node["uuid"],
                 name=node["name"],
@@ -279,7 +279,7 @@ class ZepEntityReader:
                 attributes=node["attributes"],
             )
             
-            # 获取相关边和节点
+            # Lấy cạnh và nút liên quan
             if enrich_with_edges:
                 related_edges = []
                 related_node_uuids = set()
@@ -304,7 +304,7 @@ class ZepEntityReader:
                 
                 entity.related_edges = related_edges
                 
-                # 获取关联节点的基本信息
+                # Lấy thông tin cơ bản của các nút liên quan
                 related_nodes = []
                 for related_uuid in related_node_uuids:
                     if related_uuid in node_map:
@@ -320,8 +320,8 @@ class ZepEntityReader:
             
             filtered_entities.append(entity)
         
-        logger.info(f"筛选完成: 总节点 {total_count}, 符合条件 {len(filtered_entities)}, "
-                   f"实体类型: {entity_types_found}")
+        logger.info(f"Lọc xong: tổng số nút {total_count}, phù hợp {len(filtered_entities)}, "
+                   f"loại thực thể: {entity_types_found}")
         
         return FilteredEntities(
             entities=filtered_entities,
@@ -336,33 +336,33 @@ class ZepEntityReader:
         entity_uuid: str
     ) -> Optional[EntityNode]:
         """
-        获取单个实体及其完整上下文（边和关联节点，带重试机制）
+        Lấy một thực thể cùng toàn bộ ngữ cảnh của nó (cạnh và nút liên quan, có cơ chế thử lại)
         
         Args:
-            graph_id: 图谱ID
-            entity_uuid: 实体UUID
+            graph_id: ID đồ thị
+            entity_uuid: UUID của thực thể
             
         Returns:
-            EntityNode或None
+            EntityNode hoặc None
         """
         try:
-            # 使用重试机制获取节点
+            # Dùng cơ chế thử lại để lấy nút
             node = self._call_with_retry(
                 func=lambda: self.client.graph.node.get(uuid_=entity_uuid),
-                operation_name=f"获取节点详情(uuid={entity_uuid[:8]}...)"
+                operation_name=f"lấy chi tiết nút (uuid={entity_uuid[:8]}...)"
             )
             
             if not node:
                 return None
             
-            # 获取节点的边
+            # Lấy các cạnh của nút
             edges = self.get_node_edges(entity_uuid)
             
-            # 获取所有节点用于关联查找
+            # Lấy toàn bộ nút để phục vụ tra cứu liên kết
             all_nodes = self.get_all_nodes(graph_id)
             node_map = {n["uuid"]: n for n in all_nodes}
             
-            # 处理相关边和节点
+            # Xử lý cạnh và nút liên quan
             related_edges = []
             related_node_uuids = set()
             
@@ -384,7 +384,7 @@ class ZepEntityReader:
                     })
                     related_node_uuids.add(edge["source_node_uuid"])
             
-            # 获取关联节点信息
+            # Lấy thông tin nút liên quan
             related_nodes = []
             for related_uuid in related_node_uuids:
                 if related_uuid in node_map:
@@ -407,7 +407,7 @@ class ZepEntityReader:
             )
             
         except Exception as e:
-            logger.error(f"获取实体 {entity_uuid} 失败: {str(e)}")
+            logger.error(f"Lấy thực thể {entity_uuid} thất bại: {str(e)}")
             return None
     
     def get_entities_by_type(
@@ -417,15 +417,15 @@ class ZepEntityReader:
         enrich_with_edges: bool = True
     ) -> List[EntityNode]:
         """
-        获取指定类型的所有实体
+        Lấy toàn bộ thực thể theo loại chỉ định
         
         Args:
-            graph_id: 图谱ID
-            entity_type: 实体类型（如 "Student", "PublicFigure" 等）
-            enrich_with_edges: 是否获取相关边信息
+            graph_id: ID đồ thị
+            entity_type: Loại thực thể (ví dụ: "Student", "PublicFigure", ...)
+            enrich_with_edges: Có lấy thông tin cạnh liên quan hay không
             
         Returns:
-            实体列表
+            Danh sách thực thể
         """
         result = self.filter_defined_entities(
             graph_id=graph_id,

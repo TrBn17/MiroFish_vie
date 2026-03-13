@@ -1,7 +1,4 @@
-"""
-图谱相关API路由
-采用项目上下文机制，服务端持久化状态
-"""
+"""Graph API routes using persisted project context on the server."""
 
 import os
 import traceback
@@ -18,31 +15,31 @@ from ..utils.logger import get_logger
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
-# 获取日志器
+# Get logger.
 logger = get_logger('mirofish.api')
 
 
 def allowed_file(filename: str) -> bool:
-    """检查文件扩展名是否允许"""
+    """Check whether the file extension is allowed."""
     if not filename or '.' not in filename:
         return False
     ext = os.path.splitext(filename)[1].lower().lstrip('.')
     return ext in Config.ALLOWED_EXTENSIONS
 
 
-# ============== 项目管理接口 ==============
+# ============== Project management APIs ==============
 
 @graph_bp.route('/project/<project_id>', methods=['GET'])
 def get_project(project_id: str):
     """
-    获取项目详情
+    Lấy chi tiết dự án.
     """
     project = ProjectManager.get_project(project_id)
     
     if not project:
         return jsonify({
             "success": False,
-            "error": f"项目不存在: {project_id}"
+            "error": f"Project not found: {project_id}"
         }), 404
     
     return jsonify({
@@ -54,7 +51,7 @@ def get_project(project_id: str):
 @graph_bp.route('/project/list', methods=['GET'])
 def list_projects():
     """
-    列出所有项目
+    Liệt kê tất cả dự án.
     """
     limit = request.args.get('limit', 50, type=int)
     projects = ProjectManager.list_projects(limit=limit)
@@ -69,36 +66,36 @@ def list_projects():
 @graph_bp.route('/project/<project_id>', methods=['DELETE'])
 def delete_project(project_id: str):
     """
-    删除项目
+    Xóa dự án.
     """
     success = ProjectManager.delete_project(project_id)
     
     if not success:
         return jsonify({
             "success": False,
-            "error": f"项目不存在或删除失败: {project_id}"
+            "error": f"Project not found or deletion failed: {project_id}"
         }), 404
     
     return jsonify({
         "success": True,
-        "message": f"项目已删除: {project_id}"
+        "message": f"Project deleted: {project_id}"
     })
 
 
 @graph_bp.route('/project/<project_id>/reset', methods=['POST'])
 def reset_project(project_id: str):
     """
-    重置项目状态（用于重新构建图谱）
+    Đặt lại trạng thái dự án để xây dựng lại đồ thị.
     """
     project = ProjectManager.get_project(project_id)
     
     if not project:
         return jsonify({
             "success": False,
-            "error": f"项目不存在: {project_id}"
+            "error": f"Project not found: {project_id}"
         }), 404
     
-    # 重置到本体已生成状态
+    # Reset back to ontology-generated state when ontology exists.
     if project.ontology:
         project.status = ProjectStatus.ONTOLOGY_GENERATED
     else:
@@ -111,27 +108,27 @@ def reset_project(project_id: str):
     
     return jsonify({
         "success": True,
-        "message": f"项目已重置: {project_id}",
+        "message": f"Project reset: {project_id}",
         "data": project.to_dict()
     })
 
 
-# ============== 接口1：上传文件并生成本体 ==============
+# ============== API 1: Tải tệp và sinh ontology ==============
 
 @graph_bp.route('/ontology/generate', methods=['POST'])
 def generate_ontology():
     """
-    接口1：上传文件，分析生成本体定义
-    
-    请求方式：multipart/form-data
-    
-    参数：
-        files: 上传的文件（PDF/MD/TXT），可多个
-        simulation_requirement: 模拟需求描述（必填）
-        project_name: 项目名称（可选）
-        additional_context: 额外说明（可选）
-        
-    返回：
+    API 1: tải tệp lên, phân tích và sinh định nghĩa ontology.
+
+    Phương thức yêu cầu: `multipart/form-data`
+
+    Tham số:
+        files: các tệp tải lên (PDF/MD/TXT), có thể nhiều tệp
+        simulation_requirement: mô tả yêu cầu mô phỏng (bắt buộc)
+        project_name: tên dự án (tùy chọn)
+        additional_context: ghi chú bổ sung (tùy chọn)
+
+    Trả về:
         {
             "success": true,
             "data": {
@@ -147,42 +144,42 @@ def generate_ontology():
         }
     """
     try:
-        logger.info("=== 开始生成本体定义 ===")
+        logger.info("=== Starting ontology generation ===")
         
-        # 获取参数
+        # Read request parameters.
         simulation_requirement = request.form.get('simulation_requirement', '')
         project_name = request.form.get('project_name', 'Unnamed Project')
         additional_context = request.form.get('additional_context', '')
         
-        logger.debug(f"项目名称: {project_name}")
-        logger.debug(f"模拟需求: {simulation_requirement[:100]}...")
+        logger.debug(f"Project name: {project_name}")
+        logger.debug(f"Simulation requirement: {simulation_requirement[:100]}...")
         
         if not simulation_requirement:
             return jsonify({
                 "success": False,
-                "error": "请提供模拟需求描述 (simulation_requirement)"
+                "error": "Please provide simulation_requirement"
             }), 400
         
-        # 获取上传的文件
+        # Get uploaded files.
         uploaded_files = request.files.getlist('files')
         if not uploaded_files or all(not f.filename for f in uploaded_files):
             return jsonify({
                 "success": False,
-                "error": "请至少上传一个文档文件"
+                "error": "Please upload at least one document file"
             }), 400
         
-        # 创建项目
+        # Create project.
         project = ProjectManager.create_project(name=project_name)
         project.simulation_requirement = simulation_requirement
-        logger.info(f"创建项目: {project.project_id}")
+        logger.info(f"Created project: {project.project_id}")
         
-        # 保存文件并提取文本
+        # Save files and extract text.
         document_texts = []
         all_text = ""
         
         for file in uploaded_files:
             if file and file.filename and allowed_file(file.filename):
-                # 保存文件到项目目录
+                # Save file into the project directory.
                 file_info = ProjectManager.save_file_to_project(
                     project.project_id, 
                     file, 
@@ -193,7 +190,7 @@ def generate_ontology():
                     "size": file_info["size"]
                 })
                 
-                # 提取文本
+                # Extract text.
                 text = FileParser.extract_text(file_info["path"])
                 text = TextProcessor.preprocess_text(text)
                 document_texts.append(text)
@@ -203,16 +200,16 @@ def generate_ontology():
             ProjectManager.delete_project(project.project_id)
             return jsonify({
                 "success": False,
-                "error": "没有成功处理任何文档，请检查文件格式"
+                "error": "No documents were processed successfully. Please check the file formats"
             }), 400
         
-        # 保存提取的文本
+        # Save extracted text.
         project.total_text_length = len(all_text)
         ProjectManager.save_extracted_text(project.project_id, all_text)
-        logger.info(f"文本提取完成，共 {len(all_text)} 字符")
+        logger.info(f"Text extraction complete, total {len(all_text)} characters")
         
-        # 生成本体
-        logger.info("调用 LLM 生成本体定义...")
+        # Generate ontology.
+        logger.info("Calling the LLM to generate ontology definitions...")
         generator = OntologyGenerator()
         ontology = generator.generate(
             document_texts=document_texts,
@@ -220,10 +217,10 @@ def generate_ontology():
             additional_context=additional_context if additional_context else None
         )
         
-        # 保存本体到项目
+        # Save ontology to the project.
         entity_count = len(ontology.get("entity_types", []))
         edge_count = len(ontology.get("edge_types", []))
-        logger.info(f"本体生成完成: {entity_count} 个实体类型, {edge_count} 个关系类型")
+        logger.info(f"Ontology generation complete: {entity_count} entity types, {edge_count} relationship types")
         
         project.ontology = {
             "entity_types": ontology.get("entity_types", []),
@@ -232,7 +229,7 @@ def generate_ontology():
         project.analysis_summary = ontology.get("analysis_summary", "")
         project.status = ProjectStatus.ONTOLOGY_GENERATED
         ProjectManager.save_project(project)
-        logger.info(f"=== 本体生成完成 === 项目ID: {project.project_id}")
+        logger.info(f"=== Ontology generation complete === project_id: {project.project_id}")
         
         return jsonify({
             "success": True,
@@ -254,140 +251,140 @@ def generate_ontology():
         }), 500
 
 
-# ============== 接口2：构建图谱 ==============
+# ============== API 2: Xây dựng đồ thị ==============
 
 @graph_bp.route('/build', methods=['POST'])
 def build_graph():
     """
-    接口2：根据project_id构建图谱
-    
-    请求（JSON）：
+    API 2: xây dựng đồ thị theo `project_id`.
+
+    Yêu cầu (JSON):
         {
-            "project_id": "proj_xxxx",  // 必填，来自接口1
-            "graph_name": "图谱名称",    // 可选
-            "chunk_size": 500,          // 可选，默认500
-            "chunk_overlap": 50         // 可选，默认50
+            "project_id": "proj_xxxx",  // bắt buộc, lấy từ API 1
+            "graph_name": "Tên đồ thị", // tùy chọn
+            "chunk_size": 500,          // tùy chọn, mặc định 500
+            "chunk_overlap": 50         // tùy chọn, mặc định 50
         }
-        
-    返回：
+
+    Trả về:
         {
             "success": true,
             "data": {
                 "project_id": "proj_xxxx",
                 "task_id": "task_xxxx",
-                "message": "图谱构建任务已启动"
+                "message": "Tác vụ xây dựng đồ thị đã được khởi động"
             }
         }
     """
     try:
-        logger.info("=== 开始构建图谱 ===")
+        logger.info("=== Bắt đầu xây dựng đồ thị ===")
         
-        # 检查配置
+        # Kiểm tra cấu hình
         errors = []
         if not Config.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY未配置")
+            errors.append("ZEP_API_KEY chưa được cấu hình")
         if errors:
-            logger.error(f"配置错误: {errors}")
+            logger.error(f"Lỗi cấu hình: {errors}")
             return jsonify({
                 "success": False,
-                "error": "配置错误: " + "; ".join(errors)
+                "error": "Lỗi cấu hình: " + "; ".join(errors)
             }), 500
         
-        # 解析请求
+        # Phân tích yêu cầu
         data = request.get_json() or {}
         project_id = data.get('project_id')
-        logger.debug(f"请求参数: project_id={project_id}")
+        logger.debug(f"Tham số yêu cầu: project_id={project_id}")
         
         if not project_id:
             return jsonify({
                 "success": False,
-                "error": "请提供 project_id"
+                "error": "Vui lòng cung cấp project_id"
             }), 400
         
-        # 获取项目
+        # Lấy dự án
         project = ProjectManager.get_project(project_id)
         if not project:
             return jsonify({
                 "success": False,
-                "error": f"项目不存在: {project_id}"
+                "error": f"Không tìm thấy dự án: {project_id}"
             }), 404
         
-        # 检查项目状态
-        force = data.get('force', False)  # 强制重新构建
+        # Kiểm tra trạng thái dự án
+        force = data.get('force', False)  # Bắt buộc xây dựng lại
         
         if project.status == ProjectStatus.CREATED:
             return jsonify({
                 "success": False,
-                "error": "项目尚未生成本体，请先调用 /ontology/generate"
+                "error": "Dự án chưa sinh ontology, vui lòng gọi /ontology/generate trước"
             }), 400
         
         if project.status == ProjectStatus.GRAPH_BUILDING and not force:
             return jsonify({
                 "success": False,
-                "error": "图谱正在构建中，请勿重复提交。如需强制重建，请添加 force: true",
+                "error": "Đồ thị đang được xây dựng, vui lòng không gửi lặp lại. Nếu muốn xây dựng lại bắt buộc, hãy thêm force: true",
                 "task_id": project.graph_build_task_id
             }), 400
         
-        # 如果强制重建，重置状态
+        # Nếu bắt buộc xây dựng lại thì đặt lại trạng thái
         if force and project.status in [ProjectStatus.GRAPH_BUILDING, ProjectStatus.FAILED, ProjectStatus.GRAPH_COMPLETED]:
             project.status = ProjectStatus.ONTOLOGY_GENERATED
             project.graph_id = None
             project.graph_build_task_id = None
             project.error = None
         
-        # 获取配置
+        # Lấy cấu hình
         graph_name = data.get('graph_name', project.name or 'MiroFish Graph')
         chunk_size = data.get('chunk_size', project.chunk_size or Config.DEFAULT_CHUNK_SIZE)
         chunk_overlap = data.get('chunk_overlap', project.chunk_overlap or Config.DEFAULT_CHUNK_OVERLAP)
         
-        # 更新项目配置
+        # Cập nhật cấu hình dự án
         project.chunk_size = chunk_size
         project.chunk_overlap = chunk_overlap
         
-        # 获取提取的文本
+        # Lấy văn bản đã trích xuất
         text = ProjectManager.get_extracted_text(project_id)
         if not text:
             return jsonify({
                 "success": False,
-                "error": "未找到提取的文本内容"
+                "error": "Không tìm thấy nội dung văn bản đã trích xuất"
             }), 400
         
-        # 获取本体
+        # Lấy ontology
         ontology = project.ontology
         if not ontology:
             return jsonify({
                 "success": False,
-                "error": "未找到本体定义"
+                "error": "Không tìm thấy định nghĩa ontology"
             }), 400
         
-        # 创建异步任务
+        # Tạo tác vụ bất đồng bộ
         task_manager = TaskManager()
-        task_id = task_manager.create_task(f"构建图谱: {graph_name}")
-        logger.info(f"创建图谱构建任务: task_id={task_id}, project_id={project_id}")
+        task_id = task_manager.create_task(f"Xây dựng đồ thị: {graph_name}")
+        logger.info(f"Đã tạo tác vụ xây dựng đồ thị: task_id={task_id}, project_id={project_id}")
         
-        # 更新项目状态
+        # Cập nhật trạng thái dự án
         project.status = ProjectStatus.GRAPH_BUILDING
         project.graph_build_task_id = task_id
         ProjectManager.save_project(project)
         
-        # 启动后台任务
+        # Khởi động tác vụ nền
         def build_task():
             build_logger = get_logger('mirofish.build')
             try:
-                build_logger.info(f"[{task_id}] 开始构建图谱...")
+                build_logger.info(f"[{task_id}] Bắt đầu xây dựng đồ thị...")
                 task_manager.update_task(
                     task_id, 
                     status=TaskStatus.PROCESSING,
-                    message="初始化图谱构建服务..."
+                    message="Đang khởi tạo dịch vụ xây dựng đồ thị..."
                 )
                 
-                # 创建图谱构建服务
+                # Tạo dịch vụ xây dựng đồ thị
                 builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
                 
-                # 分块
+                # Chia đoạn văn bản
                 task_manager.update_task(
                     task_id,
-                    message="文本分块中...",
+                    message="Đang chia nhỏ văn bản...",
                     progress=5
                 )
                 chunks = TextProcessor.split_text(
@@ -397,27 +394,27 @@ def build_graph():
                 )
                 total_chunks = len(chunks)
                 
-                # 创建图谱
+                # Tạo đồ thị
                 task_manager.update_task(
                     task_id,
-                    message="创建Zep图谱...",
+                    message="Đang tạo đồ thị Zep...",
                     progress=10
                 )
                 graph_id = builder.create_graph(name=graph_name)
                 
-                # 更新项目的graph_id
+                # Cập nhật graph_id của dự án
                 project.graph_id = graph_id
                 ProjectManager.save_project(project)
                 
-                # 设置本体
+                # Thiết lập ontology
                 task_manager.update_task(
                     task_id,
-                    message="设置本体定义...",
+                    message="Đang thiết lập định nghĩa ontology...",
                     progress=15
                 )
                 builder.set_ontology(graph_id, ontology)
                 
-                # 添加文本（progress_callback 签名是 (msg, progress_ratio)）
+                # Thêm văn bản (`progress_callback` có chữ ký là `(msg, progress_ratio)`)
                 def add_progress_callback(msg, progress_ratio):
                     progress = 15 + int(progress_ratio * 40)  # 15% - 55%
                     task_manager.update_task(
@@ -428,7 +425,7 @@ def build_graph():
                 
                 task_manager.update_task(
                     task_id,
-                    message=f"开始添加 {total_chunks} 个文本块...",
+                    message=f"Bắt đầu thêm {total_chunks} đoạn văn bản...",
                     progress=15
                 )
                 
@@ -439,10 +436,10 @@ def build_graph():
                     progress_callback=add_progress_callback
                 )
                 
-                # 等待Zep处理完成（查询每个episode的processed状态）
+                # Chờ Zep xử lý xong bằng cách kiểm tra trạng thái `processed` của từng episode
                 task_manager.update_task(
                     task_id,
-                    message="等待Zep处理数据...",
+                    message="Đang chờ Zep xử lý dữ liệu...",
                     progress=55
                 )
                 
@@ -456,27 +453,27 @@ def build_graph():
                 
                 builder._wait_for_episodes(episode_uuids, wait_progress_callback)
                 
-                # 获取图谱数据
+                # Lấy dữ liệu đồ thị
                 task_manager.update_task(
                     task_id,
-                    message="获取图谱数据...",
+                    message="Đang lấy dữ liệu đồ thị...",
                     progress=95
                 )
                 graph_data = builder.get_graph_data(graph_id)
                 
-                # 更新项目状态
+                # Cập nhật trạng thái dự án
                 project.status = ProjectStatus.GRAPH_COMPLETED
                 ProjectManager.save_project(project)
                 
                 node_count = graph_data.get("node_count", 0)
                 edge_count = graph_data.get("edge_count", 0)
-                build_logger.info(f"[{task_id}] 图谱构建完成: graph_id={graph_id}, 节点={node_count}, 边={edge_count}")
+                build_logger.info(f"[{task_id}] Xây dựng đồ thị hoàn tất: graph_id={graph_id}, nút={node_count}, cạnh={edge_count}")
                 
-                # 完成
+                # Hoàn tất
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.COMPLETED,
-                    message="图谱构建完成",
+                    message="Xây dựng đồ thị hoàn tất",
                     progress=100,
                     result={
                         "project_id": project_id,
@@ -488,8 +485,8 @@ def build_graph():
                 )
                 
             except Exception as e:
-                # 更新项目状态为失败
-                build_logger.error(f"[{task_id}] 图谱构建失败: {str(e)}")
+                # Cập nhật trạng thái dự án là thất bại
+                build_logger.error(f"[{task_id}] Xây dựng đồ thị thất bại: {str(e)}")
                 build_logger.debug(traceback.format_exc())
                 
                 project.status = ProjectStatus.FAILED
@@ -499,11 +496,11 @@ def build_graph():
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.FAILED,
-                    message=f"构建失败: {str(e)}",
+                    message=f"Xây dựng thất bại: {str(e)}",
                     error=traceback.format_exc()
                 )
         
-        # 启动后台线程
+        # Khởi động luồng nền
         thread = threading.Thread(target=build_task, daemon=True)
         thread.start()
         
@@ -512,7 +509,7 @@ def build_graph():
             "data": {
                 "project_id": project_id,
                 "task_id": task_id,
-                "message": "图谱构建任务已启动，请通过 /task/{task_id} 查询进度"
+                "message": "Tác vụ xây dựng đồ thị đã được khởi động, vui lòng dùng /task/{task_id} để theo dõi tiến độ"
             }
         })
         
@@ -524,19 +521,19 @@ def build_graph():
         }), 500
 
 
-# ============== 任务查询接口 ==============
+# ============== API truy vấn tác vụ ==============
 
 @graph_bp.route('/task/<task_id>', methods=['GET'])
 def get_task(task_id: str):
     """
-    查询任务状态
+    Truy vấn trạng thái tác vụ.
     """
     task = TaskManager().get_task(task_id)
     
     if not task:
         return jsonify({
             "success": False,
-            "error": f"任务不存在: {task_id}"
+            "error": f"Không tìm thấy tác vụ: {task_id}"
         }), 404
     
     return jsonify({
@@ -548,29 +545,29 @@ def get_task(task_id: str):
 @graph_bp.route('/tasks', methods=['GET'])
 def list_tasks():
     """
-    列出所有任务
+    Liệt kê tất cả tác vụ.
     """
     tasks = TaskManager().list_tasks()
     
     return jsonify({
         "success": True,
-        "data": [t.to_dict() for t in tasks],
+        "data": tasks,
         "count": len(tasks)
     })
 
 
-# ============== 图谱数据接口 ==============
+# ============== API dữ liệu đồ thị ==============
 
 @graph_bp.route('/data/<graph_id>', methods=['GET'])
 def get_graph_data(graph_id: str):
     """
-    获取图谱数据（节点和边）
+    Lấy dữ liệu đồ thị, bao gồm nút và cạnh.
     """
     try:
         if not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY未配置"
+                "error": "ZEP_API_KEY chưa được cấu hình"
             }), 500
         
         builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
@@ -592,13 +589,13 @@ def get_graph_data(graph_id: str):
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
-    删除Zep图谱
+    Xóa đồ thị Zep.
     """
     try:
         if not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY未配置"
+                "error": "ZEP_API_KEY chưa được cấu hình"
             }), 500
         
         builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
@@ -606,7 +603,7 @@ def delete_graph(graph_id: str):
         
         return jsonify({
             "success": True,
-            "message": f"图谱已删除: {graph_id}"
+            "message": f"Đồ thị đã được xóa: {graph_id}"
         })
         
     except Exception as e:

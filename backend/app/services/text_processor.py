@@ -1,17 +1,15 @@
-"""
-文本处理服务
-"""
+"""Dich vu xu ly van ban."""
 
 from typing import List, Optional
 from ..utils.file_parser import FileParser, split_text_into_chunks
 
 
 class TextProcessor:
-    """文本处理器"""
+    """Bo xu ly van ban."""
     
     @staticmethod
     def extract_from_files(file_paths: List[str]) -> str:
-        """从多个文件提取文本"""
+        """Trich xuat van ban tu nhieu tep."""
         return FileParser.extract_from_multiple(file_paths)
     
     @staticmethod
@@ -21,40 +19,40 @@ class TextProcessor:
         overlap: int = 50
     ) -> List[str]:
         """
-        分割文本
-        
+        Chia nho van ban.
+
         Args:
-            text: 原始文本
-            chunk_size: 块大小
-            overlap: 重叠大小
-            
+            text: Van ban goc.
+            chunk_size: Kich thuoc moi doan.
+            overlap: So ky tu chong lap giua hai doan.
+
         Returns:
-            文本块列表
+            Danh sach cac doan van ban.
         """
         return split_text_into_chunks(text, chunk_size, overlap)
     
     @staticmethod
     def preprocess_text(text: str) -> str:
         """
-        预处理文本
-        - 移除多余空白
-        - 标准化换行
-        
+        Tien xu ly van ban.
+        - Loai bo khoang trang thua
+        - Chuan hoa ky tu xuong dong
+
         Args:
-            text: 原始文本
-            
+            text: Van ban goc.
+
         Returns:
-            处理后的文本
+            Van ban sau xu ly.
         """
         import re
         
-        # 标准化换行
+        # Chuan hoa ky tu xuong dong
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # 移除连续空行（保留最多两个换行）
+        # Loai bo nhieu dong trong lien tiep, chi giu toi da hai dau xuong dong
         text = re.sub(r'\n{3,}', '\n\n', text)
         
-        # 移除行首行尾空白
+        # Loai bo khoang trang o dau va cuoi moi dong
         lines = [line.strip() for line in text.split('\n')]
         text = '\n'.join(lines)
         
@@ -62,7 +60,7 @@ class TextProcessor:
     
     @staticmethod
     def get_text_stats(text: str) -> dict:
-        """获取文本统计信息"""
+        """Lay thong tin thong ke cua van ban."""
         return {
             "total_chars": len(text),
             "total_lines": text.count('\n') + 1,
