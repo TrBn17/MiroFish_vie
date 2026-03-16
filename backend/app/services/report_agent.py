@@ -30,19 +30,19 @@ logger = get_logger("mirofish.report_agent")
 
 class ReportLogger:
     """
-    Trinh ghi nhat ky chi tiet cho Report Agent
+    Trình ghi nhật ký chi tiết cho Report Agent.
 
-    Tao tep `agent_log.jsonl` trong thu muc bao cao de ghi lai tung buoc chi tiet.
-    Moi dong la mot doi tuong JSON day du, gom dau thoi gian, loai hanh dong,
-    noi dung chi tiet va cac thong tin lien quan.
+    Tạo tệp `agent_log.jsonl` trong thư mục báo cáo để ghi lại từng bước chi tiết.
+    Mỗi dòng là một đối tượng JSON đầy đủ, gồm dấu thời gian, loại hành động,
+    nội dung chi tiết và các thông tin liên quan.
     """
 
     def __init__(self, report_id: str):
         """
-        Khoi tao trinh ghi nhat ky.
+        Khởi tạo trình ghi nhật ký.
 
         Args:
-            report_id: ID bao cao, dung de xac dinh duong dan tep nhat ky.
+            report_id: ID báo cáo, dùng để xác định đường dẫn tệp nhật ký.
         """
         self.report_id = report_id
         self.log_file_path = os.path.join(
@@ -52,12 +52,12 @@ class ReportLogger:
         self._ensure_log_file()
 
     def _ensure_log_file(self):
-        """Dam bao thu muc chua tep nhat ky ton tai."""
+        """Đảm bảo thư mục chứa tệp nhật ký tồn tại."""
         log_dir = os.path.dirname(self.log_file_path)
         os.makedirs(log_dir, exist_ok=True)
 
     def _get_elapsed_time(self) -> float:
-        """Lay thoi gian da troi qua tinh tu luc bat dau (giay)."""
+        """Lấy thời gian đã trôi qua tính từ lúc bắt đầu (giây)."""
         return (datetime.now() - self.start_time).total_seconds()
 
     def log(
@@ -69,14 +69,14 @@ class ReportLogger:
         section_index: int = None,
     ):
         """
-        Ghi mot ban ghi nhat ky.
+        Ghi một bản ghi nhật ký.
 
         Args:
-            action: Loai hanh dong, vi du `start`, `tool_call`, `llm_response`, `section_complete`.
-            stage: Giai doan hien tai, vi du `planning`, `generating`, `completed`.
-            details: Tu dien noi dung chi tiet, khong cat ngan.
-            section_title: Tieu de chuong hien tai (tuy chon).
-            section_index: Chi so chuong hien tai (tuy chon).
+            action: Loại hành động, ví dụ `start`, `tool_call`, `llm_response`, `section_complete`.
+            stage: Giai đoạn hiện tại, ví dụ `planning`, `generating`, `completed`.
+            details: Từ điển nội dung chi tiết, không cắt ngắn.
+            section_title: Tiêu đề chương hiện tại (tùy chọn).
+            section_index: Chỉ số chương hiện tại (tùy chọn).
         """
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -89,12 +89,12 @@ class ReportLogger:
             "details": details,
         }
 
-        # Ghi noi tiep vao tep JSONL
+        # Ghi nối tiếp vào tệp JSONL.
         with open(self.log_file_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
     def log_start(self, simulation_id: str, graph_id: str, simulation_requirement: str):
-        """Ghi nhan viec bat dau tao bao cao."""
+        """Ghi nhận việc bắt đầu tạo báo cáo."""
         self.log(
             action="report_start",
             stage="pending",
@@ -102,48 +102,48 @@ class ReportLogger:
                 "simulation_id": simulation_id,
                 "graph_id": graph_id,
                 "simulation_requirement": simulation_requirement,
-                "message": "Bat dau tac vu tao bao cao",
+                "message": "Bắt đầu tác vụ tạo báo cáo",
             },
         )
 
     def log_planning_start(self):
-        """Ghi nhan viec bat dau lap de cuong."""
+        """Ghi nhận việc bắt đầu lập đề cương."""
         self.log(
             action="planning_start",
             stage="planning",
-            details={"message": "Bat dau lap de cuong bao cao"},
+            details={"message": "Bắt đầu lập đề cương báo cáo"},
         )
 
     def log_planning_context(self, context: Dict[str, Any]):
-        """Ghi nhan thong tin boi canh lay duoc khi lap ke hoach."""
+        """Ghi nhận thông tin bối cảnh lấy được khi lập kế hoạch."""
         self.log(
             action="planning_context",
             stage="planning",
-            details={"message": "Lay thong tin boi canh mo phong", "context": context},
+            details={"message": "Lấy thông tin bối cảnh mô phỏng", "context": context},
         )
 
     def log_planning_complete(self, outline_dict: Dict[str, Any]):
-        """Ghi nhan viec lap de cuong hoan tat."""
+        """Ghi nhận việc lập đề cương hoàn tất."""
         self.log(
             action="planning_complete",
             stage="planning",
-            details={"message": "Da lap de cuong xong", "outline": outline_dict},
+            details={"message": "Đã lập đề cương báo cáo xong", "outline": outline_dict},
         )
 
     def log_section_start(self, section_title: str, section_index: int):
-        """Ghi nhan viec bat dau tao chuong."""
+        """Ghi nhận việc bắt đầu tạo chương."""
         self.log(
             action="section_start",
             stage="generating",
             section_title=section_title,
             section_index=section_index,
-            details={"message": f"Bat dau tao chuong: {section_title}"},
+            details={"message": f"Bắt đầu tạo chương: {section_title}"},
         )
 
     def log_react_thought(
         self, section_title: str, section_index: int, iteration: int, thought: str
     ):
-        """Ghi nhan qua trinh suy nghi ReACT."""
+        """Ghi nhận quá trình suy nghĩ ReACT."""
         self.log(
             action="react_thought",
             stage="generating",
@@ -152,7 +152,7 @@ class ReportLogger:
             details={
                 "iteration": iteration,
                 "thought": thought,
-                "message": f"Vong suy nghi ReACT thu {iteration}",
+                "message": f"Vòng suy nghĩ ReACT thứ {iteration}",
             },
         )
 
@@ -164,7 +164,7 @@ class ReportLogger:
         parameters: Dict[str, Any],
         iteration: int,
     ):
-        """Ghi nhan viec goi cong cu."""
+        """Ghi nhận việc gọi công cụ."""
         self.log(
             action="tool_call",
             stage="generating",
@@ -174,7 +174,7 @@ class ReportLogger:
                 "iteration": iteration,
                 "tool_name": tool_name,
                 "parameters": parameters,
-                "message": f"Goi cong cu: {tool_name}",
+                "message": f"Gọi công cụ: {tool_name}",
             },
         )
 
@@ -186,7 +186,7 @@ class ReportLogger:
         result: str,
         iteration: int,
     ):
-        """Ghi nhan ket qua goi cong cu (giu nguyen noi dung day du)."""
+        """Ghi nhận kết quả gọi công cụ (giữ nguyên nội dung đầy đủ)."""
         self.log(
             action="tool_result",
             stage="generating",
@@ -195,9 +195,9 @@ class ReportLogger:
             details={
                 "iteration": iteration,
                 "tool_name": tool_name,
-                "result": result,  # Ket qua day du, khong cat ngan
+                "result": result,  # Kết quả đầy đủ, không cắt ngắn.
                 "result_length": len(result),
-                "message": f"Cong cu {tool_name} tra ve ket qua",
+                "message": f"Công cụ {tool_name} trả về kết quả",
             },
         )
 
@@ -210,7 +210,7 @@ class ReportLogger:
         has_tool_calls: bool,
         has_final_answer: bool,
     ):
-        """Ghi nhan phan hoi cua LLM (giu nguyen noi dung day du)."""
+        """Ghi nhận phản hồi của LLM (giữ nguyên nội dung đầy đủ)."""
         self.log(
             action="llm_response",
             stage="generating",
@@ -218,11 +218,11 @@ class ReportLogger:
             section_index=section_index,
             details={
                 "iteration": iteration,
-                "response": response,  # Phan hoi day du, khong cat ngan
+                "response": response,  # Phản hồi đầy đủ, không cắt ngắn.
                 "response_length": len(response),
                 "has_tool_calls": has_tool_calls,
                 "has_final_answer": has_final_answer,
-                "message": f"Phan hoi LLM (goi cong cu: {has_tool_calls}, cau tra loi cuoi: {has_final_answer})",
+                "message": f"Phản hồi LLM (gọi công cụ: {has_tool_calls}, câu trả lời cuối: {has_final_answer})",
             },
         )
 
@@ -233,17 +233,17 @@ class ReportLogger:
         content: str,
         tool_calls_count: int,
     ):
-        """Ghi nhan noi dung chuong da tao xong (chi ghi noi dung, chua co nghia la ca chuong da xong)."""
+        """Ghi nhận nội dung chương đã tạo xong (chỉ ghi nội dung, chưa có nghĩa là cả chương đã xong)."""
         self.log(
             action="section_content",
             stage="generating",
             section_title=section_title,
             section_index=section_index,
             details={
-                "content": content,  # Noi dung day du, khong cat ngan
+                "content": content,  # Nội dung đầy đủ, không cắt ngắn.
                 "content_length": len(content),
                 "tool_calls_count": tool_calls_count,
-                "message": f"Noi dung chuong {section_title} da tao xong",
+                "message": f"Nội dung chương {section_title} đã tạo xong",
             },
         )
 
@@ -251,10 +251,10 @@ class ReportLogger:
         self, section_title: str, section_index: int, full_content: str
     ):
         """
-        Ghi nhan chuong da tao xong.
+        Ghi nhận chương đã tạo xong.
 
-        Phia frontend can theo doi ban ghi nay de biet khi nao mot chuong
-        thuc su hoan tat va lay duoc noi dung day du.
+        Phía frontend cần theo dõi bản ghi này để biết khi nào một chương
+        thực sự hoàn tất và lấy được nội dung đầy đủ.
         """
         self.log(
             action="section_complete",
@@ -264,24 +264,24 @@ class ReportLogger:
             details={
                 "content": full_content,
                 "content_length": len(full_content),
-                "message": f"Chuong {section_title} da tao xong",
+                "message": f"Chương {section_title} đã tạo xong",
             },
         )
 
     def log_report_complete(self, total_sections: int, total_time_seconds: float):
-        """Ghi nhan bao cao da tao xong."""
+        """Ghi nhận báo cáo đã tạo xong."""
         self.log(
             action="report_complete",
             stage="completed",
             details={
                 "total_sections": total_sections,
                 "total_time_seconds": round(total_time_seconds, 2),
-                "message": "Bao cao da tao xong",
+                "message": "Báo cáo đã tạo xong",
             },
         )
 
     def log_error(self, error_message: str, stage: str, section_title: str = None):
-        """Ghi nhan loi."""
+        """Ghi nhận lỗi."""
         self.log(
             action="error",
             stage=stage,
@@ -289,26 +289,26 @@ class ReportLogger:
             section_index=None,
             details={
                 "error": error_message,
-                "message": f"Da xay ra loi: {error_message}",
+                "message": f"Đã xảy ra lỗi: {error_message}",
             },
         )
 
 
 class ReportConsoleLogger:
     """
-    Trinh ghi nhat ky console cho Report Agent
+    Trình ghi nhận console cho Report Agent
 
-    Ghi cac log dang console (INFO, WARNING, ...) vao tep `console_log.txt`
-    trong thu muc bao cao. Nhom log nay khac voi `agent_log.jsonl`, vi day la
-    dau ra console dang van ban thuan.
+    Ghi các log dạng console (INFO, WARNING, ...) vào tệp `console_log.txt`
+    trong thư mục báo cáo. Nhóm log này khác với `agent_log.jsonl`, vì đây là
+    đầu ra console dạng văn bản thuần.
     """
 
     def __init__(self, report_id: str):
         """
-        Khoi tao trinh ghi nhat ky console.
+        Khởi tạo trình ghi nhận console.
 
         Args:
-            report_id: ID bao cao, dung de xac dinh duong dan tep nhat ky.
+            report_id: ID báo cáo, dùng để xác định đường dẫn tệp nhật ký.
         """
         self.report_id = report_id
         self.log_file_path = os.path.join(
@@ -319,27 +319,27 @@ class ReportConsoleLogger:
         self._setup_file_handler()
 
     def _ensure_log_file(self):
-        """Dam bao thu muc chua tep nhat ky ton tai."""
+        """Đảm bảo thư mục chứa tệp nhật ký tồn tại."""
         log_dir = os.path.dirname(self.log_file_path)
         os.makedirs(log_dir, exist_ok=True)
 
     def _setup_file_handler(self):
-        """Thiet lap file handler de ghi log dong thoi vao tep."""
+        """Thiết lập file handler để ghi log đồng thời vào tệp."""
         import logging
 
-        # Tao file handler
+        # Tạo file handler.
         self._file_handler = logging.FileHandler(
             self.log_file_path, mode="a", encoding="utf-8"
         )
         self._file_handler.setLevel(logging.INFO)
 
-        # Su dung dinh dang gon giong voi console
+        # Sử dụng định dạng gọn giống với console.
         formatter = logging.Formatter(
             "[%(asctime)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S"
         )
         self._file_handler.setFormatter(formatter)
 
-        # Gan vao cac logger lien quan den report_agent
+        # Gắn vào các logger liên quan đến report_agent.
         loggers_to_attach = [
             "mirofish.report_agent",
             "mirofish.zep_tools",
@@ -347,12 +347,12 @@ class ReportConsoleLogger:
 
         for logger_name in loggers_to_attach:
             target_logger = logging.getLogger(logger_name)
-            # Tranh gan trung lap
+            # Tránh gắn trùng lặp.
             if self._file_handler not in target_logger.handlers:
                 target_logger.addHandler(self._file_handler)
 
     def close(self):
-        """Dong file handler va go bo khoi logger."""
+        """Đóng file handler và gỡ bỏ khỏi logger."""
         import logging
 
         if self._file_handler:
@@ -370,12 +370,12 @@ class ReportConsoleLogger:
             self._file_handler = None
 
     def __del__(self):
-        """Dam bao dong file handler khi huy doi tuong."""
+        """Đảm bảo đóng file handler khi hủy đối tượng."""
         self.close()
 
 
 class ReportStatus(str, Enum):
-    """Trang thai bao cao."""
+    """Trạng thái báo cáo."""
 
     PENDING = "pending"
     PLANNING = "planning"
@@ -386,7 +386,7 @@ class ReportStatus(str, Enum):
 
 @dataclass
 class ReportSection:
-    """Chuong bao cao."""
+    """Chương báo cáo."""
 
     title: str
     content: str = ""
@@ -395,7 +395,7 @@ class ReportSection:
         return {"title": self.title, "content": self.content}
 
     def to_markdown(self, level: int = 2) -> str:
-        """Chuyen sang dinh dang Markdown."""
+        """Chuyển sang định dạng Markdown."""
         md = f"{'#' * level} {self.title}\n\n"
         if self.content:
             md += f"{self.content}\n\n"
@@ -404,7 +404,7 @@ class ReportSection:
 
 @dataclass
 class ReportOutline:
-    """De cuong bao cao."""
+    """Đề cương báo cáo."""
 
     title: str
     summary: str
@@ -418,7 +418,7 @@ class ReportOutline:
         }
 
     def to_markdown(self) -> str:
-        """Chuyen sang dinh dang Markdown."""
+        """Chuyển sang định dạng Markdown."""
         md = f"# {self.title}\n\n"
         md += f"> {self.summary}\n\n"
         for section in self.sections:
@@ -428,7 +428,7 @@ class ReportOutline:
 
 @dataclass
 class Report:
-    """Bao cao day du."""
+    """Báo cáo đầy đủ."""
 
     report_id: str
     simulation_id: str
@@ -457,10 +457,10 @@ class Report:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Hang so mau prompt
+# Hằng số mẫu prompt
 # ═══════════════════════════════════════════════════════════════
 
-# ── Mo ta cong cu ──
+# ── Mô tả công cụ ──
 
 TOOL_DESC_INSIGHT_FORGE = """\
 【Truy xuất thông tin chuyên sâu - Công cụ truy xuất mạnh mẽ】
@@ -536,340 +536,339 @@ Quy trình hoạt động:
 
 【Quan trọng】Tính năng này chỉ dùng được khi môi trường mô phỏng OASIS đang chạy!"""
 
-# ── Prompt lap de cuong ──
+# ── Prompt lập đề cương ──
 
 PLAN_SYSTEM_PROMPT = """\
-Ban la chuyen gia viet "bao cao du bao tuong lai", so huu "goc nhin toan tri" doi voi the gioi mo phong - ban co the nhin thay hanh vi, phat ngon va tuong tac cua moi Agent trong mo phong.
+Bạn là chuyên gia viết "báo cáo dự báo tương lai", sở hữu "góc nhìn toàn tri" đối với thế giới mô phỏng - bạn có thể nhìn thấy hành vi, phát ngôn và tương tác của mọi Agent trong mô phỏng.
 
-【Tu tuong cot loi】
-Chung toi xay dung mot the gioi mo phong va dua vao do mot "yeu cau mo phong" cu the nhu bien dau vao. Ket qua tien hoa cua the gioi mo phong chinh la du bao ve nhung gi co the xay ra trong tuong lai. Thu ban dang quan sat khong phai la "du lieu thi nghiem", ma la "buoi dien tap cua tuong lai".
+【Tư tưởng cốt lõi】
+Chúng tôi xây dựng một thế giới mô phỏng và đưa vào đó một "yêu cầu mô phỏng" cụ thể như biến đầu vào. Kết quả tiến hóa của thế giới mô phỏng chính là dự báo về những gì có thể xảy ra trong tương lai. Thứ bạn đang quan sát không phải là "dữ liệu thí nghiệm", mà là "buổi diễn tập của tương lai".
 
-【Nhiem vu cua ban】
-Hay viet mot "bao cao du bao tuong lai" de tra loi:
-1. Duoi nhung dieu kien da dat ra, tuong lai da xay ra dieu gi?
-2. Cac nhom Agent (con nguoi) da phan ung va hanh dong nhu the nao?
-3. Mo phong nay he lo nhung xu huong va rui ro tuong lai nao dang can luu y?
+【Nhiệm vụ của bạn】
+Hãy viết một "báo cáo dự báo tương lai" để trả lời:
+1. Dưới những điều kiện đã đặt ra, tương lai đã xảy ra điều gì?
+2. Các nhóm Agent (con người) đã phản ứng và hành động như thế nào?
+3. Mô phỏng này hé lộ những xu hướng và rủi ro tương lai nào cần được lưu ý?
 
-【Dinh vi bao cao】
-- ✅ Day la bao cao du bao tuong lai dua tren mo phong, de chi ra "neu dieu nay xay ra thi tuong lai se ra sao"
-- ✅ Tap trung vao ket qua du bao: huong di cua su kien, phan ung cua nhom nguoi, hien tuong noi len, rui ro tiem an
-- ✅ Loi noi va hanh vi cua Agent trong the gioi mo phong chinh la du bao ve hanh vi con nguoi trong tuong lai
-- ❌ Khong phai phan tich hien trang cua the gioi thuc
-- ❌ Khong phai ban tong hop du luan chung chung
+【Định vị báo cáo】
+- ✅ Đây là báo cáo dự báo tương lai dựa trên mô phỏng, để chỉ ra "nếu điều này xảy ra thì tương lai sẽ ra sao"
+- ✅ Tập trung vào kết quả dự báo: hướng đi của sự kiện, phản ứng của nhóm người, hiện tượng nổi lên, rủi ro tiềm ẩn
+- ✅ Lời nói và hành vi của Agent trong thế giới mô phỏng chính là dự báo về hành vi con người trong tương lai
+- ❌ Không phải phân tích hiện trạng của thế giới thực
+- ❌ Không phải bản tổng hợp dư luận chung chung
 
-【Gioi han so luong chuong】
-- It nhat 2 chuong, nhieu nhat 5 chuong
-- Khong can chia tieu muc; moi chuong viet thanh noi dung hoan chinh
-- Noi dung can gon, tap trung vao phat hien du bao cot loi
-- Cau truc chuong do ban tu thiet ke dua tren ket qua du bao
+【Giới hạn số lượng chương】
+- Ít nhất 2 chương, nhiều nhất 5 chương
+- Không cần chia tiểu mục; mỗi chương viết thành nội dung hoàn chỉnh
+- Nội dung cần gọn, tập trung vào phát hiện dự báo cốt lõi
+- Cấu trúc chương do bạn tự thiết kế dựa trên kết quả dự báo
 
-Hay xuat de cuong bao cao o dinh dang JSON theo mau sau:
+Hãy xuất đề cương báo cáo ở định dạng JSON theo mẫu sau:
 {
-    "title": "Tieu de bao cao",
-    "summary": "Tom tat bao cao (mot cau tat y phat hien du bao cot loi)",
+    "title": "Tiêu đề báo cáo",
+    "summary": "Tóm tắt báo cáo (một câu tóm ý phát hiện dự báo cốt lõi)",
     "sections": [
         {
-            "title": "Tieu de chuong",
-            "description": "Mo ta noi dung chuong"
+            "title": "Tiêu đề chương",
+            "description": "Mô tả nội dung chương"
         }
     ]
 }
 
-Luu y: mang `sections` phai co it nhat 2 va nhieu nhat 5 phan tu!"""
+Lưu ý: mảng `sections` phải có ít nhất 2 và nhiều nhất 5 phần tử!"""
 
 PLAN_USER_PROMPT_TEMPLATE = """\
-【Thiet lap boi canh du bao】
-Bien dau vao (yeu cau mo phong) duoc dua vao the gioi mo phong: {simulation_requirement}
+【Thiết lập bối cảnh dự báo】
+Biến đầu vào (yêu cầu mô phỏng) được đưa vào thế giới mô phỏng: {simulation_requirement}
 
-【Quy mo the gioi mo phong】
-- So luong thuc the tham gia mo phong: {total_nodes}
-- So luong quan he duoc tao ra giua cac thuc the: {total_edges}
-- Phan bo loai thuc the: {entity_types}
-- So luong Agent dang hoat dong: {total_entities}
+【Quy mô thế giới mô phỏng】
+- Số lượng thực thể tham gia mô phỏng: {total_nodes}
+- Số lượng quan hệ được tạo ra giữa các thực thể: {total_edges}
+- Phân bố loại thực thể: {entity_types}
+- Số lượng Agent đang hoạt động: {total_entities}
 
-【Mau mot so su kien tuong lai duoc mo phong du bao】
+【Mẫu một số sự kiện tương lai được mô phỏng dự báo】
 {related_facts_json}
 
-Hay dung "goc nhin toan tri" de quan sat buoi dien tap tuong lai nay:
-1. Duoi nhung dieu kien da dat ra, tuong lai hien len trong trang thai nhu the nao?
-2. Cac nhom nguoi (Agent) da phan ung va hanh dong ra sao?
-3. Mo phong nay he lo nhung xu huong tuong lai nao dang can chu y?
+Hãy dùng "góc nhìn toàn tri" để quan sát buổi diễn tập tương lai này:
+1. Dưới những điều kiện đã đặt ra, tương lai hiện lên trong trạng thái như thế nào?
+2. Các nhóm người (Agent) đã phản ứng và hành động ra sao?
+3. Mô phỏng này hé lộ những xu hướng tương lai nào cần được chú ý?
 
-Duа tren ket qua du bao, hay thiet ke cau truc chuong phu hop nhat cho bao cao.
+Dựa trên kết quả dự báo, hãy thiết kế cấu trúc chương phù hợp nhất cho báo cáo.
 
-【Nhac lai】So luong chuong cua bao cao: it nhat 2, nhieu nhat 5; noi dung can gon va tap trung vao cac phat hien du bao cot loi."""
+【Nhắc lại】Số lượng chương của báo cáo: ít nhất 2, nhiều nhất 5; nội dung cần gọn và tập trung vào các phát hiện dự báo cốt lõi."""
 
-# ── Prompt tao chuong ──
+# ── Prompt tạo chương ──
 
 SECTION_SYSTEM_PROMPT_TEMPLATE = """\
-你是一个「未来预测报告」的撰写专家，正在撰写报告的一个章节。
+Bạn là chuyên gia viết "báo cáo dự báo tương lai", hiện đang viết một chương của báo cáo.
 
-报告标题: {report_title}
-报告摘要: {report_summary}
-预测场景（模拟需求）: {simulation_requirement}
+Tiêu đề báo cáo: {report_title}
+Tóm tắt báo cáo: {report_summary}
+Bối cảnh dự báo (yêu cầu mô phỏng): {simulation_requirement}
 
-当前要撰写的章节: {section_title}
-
-═══════════════════════════════════════════════════════════════
-【核心理念】
-═══════════════════════════════════════════════════════════════
-
-模拟世界是对未来的预演。我们向模拟世界注入了特定条件（模拟需求），
-模拟中Agent的行为和互动，就是对未来人群行为的预测。
-
-你的任务是：
-- 揭示在设定条件下，未来发生了什么
-- 预测各类人群（Agent）是如何反应和行动的
-- 发现值得关注的未来趋势、风险和机会
-
-❌ 不要写成对现实世界现状的分析
-✅ 要聚焦于"未来会怎样"——模拟结果就是预测的未来
+Chương đang cần viết: {section_title}
 
 ═══════════════════════════════════════════════════════════════
-【最重要的规则 - 必须遵守】
+【Tư tưởng cốt lõi】
 ═══════════════════════════════════════════════════════════════
 
-1. 【必须调用工具观察模拟世界】
-   - 你正在以「上帝视角」观察未来的预演
-   - 所有内容必须来自模拟世界中发生的事件和Agent言行
-   - 禁止使用你自己的知识来编写报告内容
-   - 每个章节至少调用3次工具（最多5次）来观察模拟的世界，它代表了未来
+Thế giới mô phỏng là buổi diễn tập của tương lai. Chúng ta đưa các điều kiện cụ thể
+(yêu cầu mô phỏng) vào thế giới mô phỏng, và hành vi cùng tương tác của Agent trong đó
+chính là dự báo về hành vi của con người trong tương lai.
 
-2. 【必须引用Agent的原始言行】
-   - Agent的发言和行为是对未来人群行为的预测
-   - 在报告中使用引用格式展示这些预测，例如：
-     > "某类人群会表示：原文内容..."
-   - 这些引用是模拟预测的核心证据
+Nhiệm vụ của bạn là:
+- Hé lộ điều gì đã xảy ra trong tương lai dưới những điều kiện đã đặt ra
+- Dự báo các nhóm người khác nhau (Agent) đã phản ứng và hành động như thế nào
+- Phát hiện những xu hướng, rủi ro và cơ hội tương lai đáng chú ý
 
-3. 【语言一致性 - 引用内容必须翻译为报告语言】
-   - 工具返回的内容可能包含英文或中英文混杂的表述
-   - 如果模拟需求和材料原文是中文的，报告必须全部使用中文撰写
-   - 当你引用工具返回的英文或中英混杂内容时，必须将其翻译为流畅的中文后再写入报告
-   - 翻译时保持原意不变，确保表述自然通顺
-   - 这一规则同时适用于正文和引用块（> 格式）中的内容
-
-4. 【忠实呈现预测结果】
-   - 报告内容必须反映模拟世界中的代表未来的模拟结果
-   - 不要添加模拟中不存在的信息
-   - 如果某方面信息不足，如实说明
+❌ Không được viết thành phân tích hiện trạng của thế giới thực
+✅ Phải tập trung vào "tương lai sẽ ra sao" - kết quả mô phỏng chính là tương lai được dự báo
 
 ═══════════════════════════════════════════════════════════════
-【⚠️ 格式规范 - 极其重要！】
+【Quy tắc quan trọng nhất - Bắt buộc tuân thủ】
 ═══════════════════════════════════════════════════════════════
 
-【一个章节 = 最小内容单位】
-- 每个章节是报告的最小分块单位
-- ❌ 禁止在章节内使用任何 Markdown 标题（#、##、###、#### 等）
-- ❌ 禁止在内容开头添加章节主标题
-- ✅ 章节标题由系统自动添加，你只需撰写纯正文内容
-- ✅ 使用**粗体**、段落分隔、引用、列表来组织内容，但不要用标题
+1. 【Bắt buộc phải gọi công cụ để quan sát thế giới mô phỏng】
+   - Bạn đang quan sát buổi diễn tập của tương lai dưới "góc nhìn toàn tri"
+   - Mọi nội dung đều phải đến từ các sự kiện và phát ngôn/hành vi của Agent trong thế giới mô phỏng
+   - Cấm sử dụng kiến thức riêng của bạn để biên soạn nội dung báo cáo
+   - Mỗi chương phải gọi công cụ ít nhất 3 lần (tối đa 5 lần) để quan sát thế giới mô phỏng, vì nó đại diện cho tương lai
 
-【正确示例】
+2. 【Bắt buộc phải trích dẫn nguyên văn lời nói/hành vi của Agent】
+   - Phát ngôn và hành vi của Agent là dự báo về hành vi của con người trong tương lai
+   - Hãy dùng định dạng trích dẫn trong báo cáo để thể hiện các dự báo này, ví dụ:
+     > "Một nhóm người nào đó sẽ nói rằng: nội dung gốc..."
+   - Những trích dẫn này là bằng chứng cốt lõi của dự báo mô phỏng
+
+3. 【Tính nhất quán ngôn ngữ - Nội dung trích dẫn phải được dịch sang ngôn ngữ của báo cáo】
+   - Nội dung do công cụ trả về có thể chứa tiếng Anh hoặc cách diễn đạt pha trộn
+   - Nếu yêu cầu mô phỏng và tư liệu gốc là tiếng Trung, báo cáo phải được viết hoàn toàn bằng tiếng Trung
+   - Khi bạn trích dẫn nội dung tiếng Anh hoặc nội dung pha trộn do công cụ trả về, phải dịch nó sang ngôn ngữ báo cáo một cách trôi chảy trước khi đưa vào báo cáo
+   - Khi dịch phải giữ nguyên ý nghĩa gốc, bảo đảm câu văn tự nhiên và mượt mà
+   - Quy tắc này áp dụng cho cả phần thân bài và khối trích dẫn (định dạng `>`)
+
+4. 【Trung thành với kết quả dự báo】
+   - Nội dung báo cáo phải phản ánh đúng kết quả mô phỏng đại diện cho tương lai trong thế giới mô phỏng
+   - Không thêm thông tin không tồn tại trong mô phỏng
+   - Nếu một khía cạnh nào đó thiếu dữ liệu, hãy nói rõ đúng như vậy
+
+═══════════════════════════════════════════════════════════════
+【⚠️ Quy chuẩn định dạng - Cực kỳ quan trọng!】
+═══════════════════════════════════════════════════════════════
+
+【Một chương = Đơn vị nội dung nhỏ nhất】
+- Mỗi chương là đơn vị chia nhỏ tối thiểu của báo cáo
+- ❌ Cấm dùng bất kỳ tiêu đề Markdown nào trong chương (`#`, `##`, `###`, `####`...)
+- ❌ Cấm thêm tiêu đề chương ở đầu nội dung
+- ✅ Tiêu đề chương sẽ do hệ thống tự động thêm, bạn chỉ cần viết phần thân bài thuần túy
+- ✅ Dùng **chữ đậm**, đoạn văn, trích dẫn và danh sách để tổ chức nội dung, nhưng không dùng tiêu đề
+
+【Ví dụ đúng】
 ```
-本章节分析了事件的舆论传播态势。通过对模拟数据的深入分析，我们发现...
+Chương này phân tích diễn biến lan truyền dư luận của sự kiện. Thông qua việc phân tích sâu dữ liệu mô phỏng, chúng tôi nhận thấy...
 
-**首发引爆阶段**
+**Giai đoạn bùng phát ban đầu**
 
-微博作为舆情的第一现场，承担了信息首发的核心功能：
+Weibo là hiện trường đầu tiên của dư luận và giữ vai trò cốt lõi trong việc phát tán thông tin ban đầu:
 
-> "微博贡献了68%的首发声量..."
+> "Weibo đóng góp 68% lượng thảo luận khởi phát..."
 
-**情绪放大阶段**
+**Giai đoạn khuếch đại cảm xúc**
 
-抖音平台进一步放大了事件影响力：
+Nền tảng Douyin tiếp tục khuếch đại sức ảnh hưởng của sự kiện:
 
-- 视觉冲击力强
-- 情绪共鸣度高
-```
-
-【错误示例】
-```
-## 执行摘要          ← 错误！不要添加任何标题
-### 一、首发阶段     ← 错误！不要用###分小节
-#### 1.1 详细分析   ← 错误！不要用####细分
-
-本章节分析了...
+- Tác động thị giác mạnh
+- Mức độ cộng hưởng cảm xúc cao
 ```
 
+【Ví dụ sai】
+```
+## Tóm tắt điều hành      ← Sai! Đừng thêm bất kỳ tiêu đề nào
+### I. Giai đoạn khởi phát ← Sai! Đừng dùng ### để chia tiểu mục
+#### 1.1 Phân tích chi tiết ← Sai! Đừng dùng #### để chia nhỏ
+
+Chương này phân tích...
+```
+
 ═══════════════════════════════════════════════════════════════
-【可用检索工具】（每章节调用3-5次）
+【Công cụ truy xuất khả dụng】 (mỗi chương gọi 3-5 lần)
 ═══════════════════════════════════════════════════════════════
 
 {tools_description}
 
-【工具使用建议 - 请混合使用不同工具，不要只用一种】
-- insight_forge: 深度洞察分析，自动分解问题并多维度检索事实和关系
-- panorama_search: 广角全景搜索，了解事件全貌、时间线和演变过程
-- quick_search: 快速验证某个具体信息点
-- interview_agents: 采访模拟Agent，获取不同角色的第一人称观点和真实反应
+【Gợi ý sử dụng công cụ - Hãy kết hợp nhiều công cụ khác nhau, đừng chỉ dùng một công cụ】
+- insight_forge: phân tích chuyên sâu, tự động phân rã vấn đề và truy xuất dữ kiện/quan hệ đa chiều
+- panorama_search: tìm kiếm toàn cảnh góc rộng, giúp hiểu toàn bộ sự kiện, dòng thời gian và diễn biến
+- quick_search: xác minh nhanh một điểm thông tin cụ thể
+- interview_agents: phỏng vấn Agent mô phỏng để lấy góc nhìn ngôi thứ nhất và phản ứng chân thực của các vai trò khác nhau
 
 ═══════════════════════════════════════════════════════════════
-【工作流程】
+【Quy trình làm việc】
 ═══════════════════════════════════════════════════════════════
 
-每次回复你只能做以下两件事之一（不可同时做）：
+Mỗi lần phản hồi, bạn chỉ được làm một trong hai việc sau (không được làm đồng thời):
 
-选项A - 调用工具：
-输出你的思考，然后用以下格式调用一个工具：
+Phương án A - Gọi công cụ:
+Xuất ra phần suy nghĩ của bạn, sau đó gọi một công cụ theo định dạng sau:
 <tool_call>
-{{"name": "工具名称", "parameters": {{"参数名": "参数值"}}}}
+{{"name": "tên_công_cụ", "parameters": {{"tên_tham_số": "giá_trị_tham_số"}}}}
 </tool_call>
-系统会执行工具并把结果返回给你。你不需要也不能自己编写工具返回结果。
+Hệ thống sẽ thực thi công cụ và trả kết quả lại cho bạn. Bạn không cần và cũng không được tự viết kết quả trả về của công cụ.
 
-选项B - 输出最终内容：
-当你已通过工具获取了足够信息，以 "Final Answer:" 开头输出章节内容。
+Phương án B - Xuất nội dung cuối cùng:
+Khi đã lấy đủ thông tin thông qua công cụ, hãy xuất nội dung chương bắt đầu bằng "Final Answer:".
 
-⚠️ 严格禁止：
-- 禁止在一次回复中同时包含工具调用和 Final Answer
-- 禁止自己编造工具返回结果（Observation），所有工具结果由系统注入
-- 每次回复最多调用一个工具
+⚠️ Nghiêm cấm:
+- Không được đồng thời chứa cả lời gọi công cụ và `Final Answer` trong cùng một phản hồi
+- Không được tự bịa kết quả công cụ trả về (`Observation`), toàn bộ kết quả công cụ sẽ do hệ thống chèn vào
+- Mỗi lần phản hồi chỉ được gọi tối đa một công cụ
 
 ═══════════════════════════════════════════════════════════════
-【章节内容要求】
+【Yêu cầu đối với nội dung chương】
 ═══════════════════════════════════════════════════════════════
 
-1. 内容必须基于工具检索到的模拟数据
-2. 大量引用原文来展示模拟效果
-3. 使用Markdown格式（但禁止使用标题）：
-   - 使用 **粗体文字** 标记重点（代替子标题）
-   - 使用列表（-或1.2.3.）组织要点
-   - 使用空行分隔不同段落
-   - ❌ 禁止使用 #、##、###、#### 等任何标题语法
-4. 【引用格式规范 - 必须单独成段】
-   引用必须独立成段，前后各有一个空行，不能混在段落中：
+1. Nội dung phải dựa trên dữ liệu mô phỏng mà công cụ truy xuất được
+2. Trích dẫn nhiều nguyên văn để thể hiện kết quả mô phỏng
+3. Sử dụng định dạng Markdown (nhưng cấm dùng tiêu đề):
+   - Dùng **chữ đậm** để đánh dấu trọng điểm (thay cho tiêu đề phụ)
+   - Dùng danh sách (`-` hoặc `1.2.3.`) để tổ chức các ý chính
+   - Dùng dòng trống để ngăn cách các đoạn khác nhau
+   - ❌ Cấm dùng bất kỳ cú pháp tiêu đề nào như `#`, `##`, `###`, `####`
+4. 【Quy chuẩn trích dẫn - Phải đứng thành đoạn riêng】
+   Trích dẫn phải là một đoạn độc lập, có một dòng trống ở trước và sau, không được trộn vào trong đoạn văn:
 
-   ✅ 正确格式：
+   ✅ Định dạng đúng:
    ```
-   校方的回应被认为缺乏实质内容。
+   Phản hồi của nhà trường bị cho là thiếu nội dung thực chất.
 
-   > "校方的应对模式在瞬息万变的社交媒体环境中显得僵化和迟缓。"
+   > "Cách ứng phó của nhà trường tỏ ra cứng nhắc và chậm chạp trong môi trường mạng xã hội thay đổi từng phút."
 
-   这一评价反映了公众的普遍不满。
+   Nhận xét này phản ánh sự bất mãn phổ biến của công chúng.
    ```
 
-   ❌ 错误格式：
+   ❌ Định dạng sai:
    ```
-   校方的回应被认为缺乏实质内容。> "校方的应对模式..." 这一评价反映了...
+   Phản hồi của nhà trường bị cho là thiếu nội dung thực chất.> "Cách ứng phó của nhà trường..." Nhận xét này phản ánh...
    ```
-5. 保持与其他章节的逻辑连贯性
-6. 【避免重复】仔细阅读下方已完成的章节内容，不要重复描述相同的信息
-7. 【再次强调】不要添加任何标题！用**粗体**代替小节标题"""
+5. Giữ tính liên kết logic với các chương khác
+6. 【Tránh lặp lại】Hãy đọc kỹ nội dung các chương đã hoàn thành ở bên dưới, đừng mô tả lại cùng một thông tin
+7. 【Nhắc lại lần nữa】Đừng thêm bất kỳ tiêu đề nào! Hãy dùng **chữ đậm** thay cho tiêu đề phụ"""
 
 SECTION_USER_PROMPT_TEMPLATE = """\
-已完成的章节内容（请仔细阅读，避免重复）：
+Nội dung các chương đã hoàn thành (hãy đọc kỹ để tránh lặp lại):
 {previous_content}
 
 ═══════════════════════════════════════════════════════════════
-【当前任务】撰写章节: {section_title}
+【Nhiệm vụ hiện tại】Viết chương: {section_title}
 ═══════════════════════════════════════════════════════════════
 
-【重要提醒】
-1. 仔细阅读上方已完成的章节，避免重复相同的内容！
-2. 开始前必须先调用工具获取模拟数据
-3. 请混合使用不同工具，不要只用一种
-4. 报告内容必须来自检索结果，不要使用自己的知识
+【Nhắc nhở quan trọng】
+1. Hãy đọc kỹ các chương đã hoàn thành ở trên để tránh lặp lại cùng một nội dung!
+2. Trước khi bắt đầu, bắt buộc phải gọi công cụ để lấy dữ liệu mô phỏng
+3. Hãy kết hợp nhiều công cụ khác nhau, đừng chỉ dùng một công cụ
+4. Nội dung báo cáo phải đến từ kết quả truy xuất, không được dùng kiến thức riêng của bạn
 
-【⚠️ 格式警告 - 必须遵守】
-- ❌ 不要写任何标题（#、##、###、####都不行）
-- ❌ 不要写"{section_title}"作为开头
-- ✅ 章节标题由系统自动添加
-- ✅ 直接写正文，用**粗体**代替小节标题
+【⚠️ Cảnh báo định dạng - Bắt buộc tuân thủ】
+- ❌ Không được viết bất kỳ tiêu đề nào (`#`, `##`, `###`, `####` đều không được)
+- ❌ Không được viết "{section_title}" ở đầu nội dung
+- ✅ Tiêu đề chương sẽ do hệ thống tự động thêm
+- ✅ Viết trực tiếp phần thân bài, dùng **chữ đậm** thay cho tiêu đề phụ
 
-请开始：
-1. 首先思考（Thought）这个章节需要什么信息
-2. 然后调用工具（Action）获取模拟数据
-3. 收集足够信息后输出 Final Answer（纯正文，无任何标题）"""
+Hãy bắt đầu:
+1. Trước tiên suy nghĩ (`Thought`) chương này cần những thông tin gì
+2. Sau đó gọi công cụ (`Action`) để lấy dữ liệu mô phỏng
+3. Khi đã thu thập đủ thông tin, xuất `Final Answer` (chỉ phần thân bài, không có bất kỳ tiêu đề nào)"""
 
-# ── ReACT 循环内消息模板 ──
+# ── Mẫu thông điệp trong vòng lặp ReACT ──
 
 REACT_OBSERVATION_TEMPLATE = """\
-Observation（检索结果）:
+Observation (kết quả truy xuất):
 
-═══ 工具 {tool_name} 返回 ═══
+═══ Công cụ {tool_name} trả về ═══
 {result}
 
 ═══════════════════════════════════════════════════════════════
-已调用工具 {tool_calls_count}/{max_tool_calls} 次（已用: {used_tools_str}）{unused_hint}
-- 如果信息充分：以 "Final Answer:" 开头输出章节内容（必须引用上述原文）
-- 如果需要更多信息：调用一个工具继续检索
+Đã gọi công cụ {tool_calls_count}/{max_tool_calls} lần (đã dùng: {used_tools_str}){unused_hint}
+- Nếu thông tin đã đủ: xuất nội dung chương bắt đầu bằng "Final Answer:" (bắt buộc phải trích dẫn nguyên văn ở trên)
+- Nếu cần thêm thông tin: gọi một công cụ để tiếp tục truy xuất
 ═══════════════════════════════════════════════════════════════"""
 
 REACT_INSUFFICIENT_TOOLS_MSG = (
-    "【注意】你只调用了{tool_calls_count}次工具，至少需要{min_tool_calls}次。"
-    "请再调用工具获取更多模拟数据，然后再输出 Final Answer。{unused_hint}"
+    "【Lưu ý】Bạn mới gọi công cụ {tool_calls_count} lần, tối thiểu cần {min_tool_calls} lần."
+    "Hãy gọi thêm công cụ để lấy nhiều dữ liệu mô phỏng hơn, rồi mới xuất Final Answer. {unused_hint}"
 )
 
 REACT_INSUFFICIENT_TOOLS_MSG_ALT = (
-    "当前只调用了 {tool_calls_count} 次工具，至少需要 {min_tool_calls} 次。"
-    "请调用工具获取模拟数据。{unused_hint}"
+    "Hiện tại bạn mới gọi công cụ {tool_calls_count} lần, tối thiểu cần {min_tool_calls} lần."
+    "Hãy gọi công cụ để lấy dữ liệu mô phỏng. {unused_hint}"
 )
 
 REACT_TOOL_LIMIT_MSG = (
-    "工具调用次数已达上限（{tool_calls_count}/{max_tool_calls}），不能再调用工具。"
-    '请立即基于已获取的信息，以 "Final Answer:" 开头输出章节内容。'
+    "Số lần gọi công cụ đã chạm giới hạn ({tool_calls_count}/{max_tool_calls}), không thể gọi thêm."
+    'Hãy lập tức dựa trên thông tin đã có để xuất nội dung chương bắt đầu bằng "Final Answer:".'
 )
 
-REACT_UNUSED_TOOLS_HINT = (
-    "\n💡 你还没有使用过: {unused_list}，建议尝试不同工具获取多角度信息"
-)
+REACT_UNUSED_TOOLS_HINT = "\n💡 Bạn vẫn chưa dùng: {unused_list}, nên thử các công cụ khác nhau để lấy thông tin đa góc nhìn"
 
-REACT_FORCE_FINAL_MSG = "已达到工具调用限制，请直接输出 Final Answer: 并生成章节内容。"
+REACT_FORCE_FINAL_MSG = "Đã chạm giới hạn gọi công cụ, hãy trực tiếp xuất Final Answer: và tạo nội dung chương."
 
 # ── Chat prompt ──
 
 CHAT_SYSTEM_PROMPT_TEMPLATE = """\
-你是一个简洁高效的模拟预测助手。
+Bạn là trợ lý dự báo mô phỏng ngắn gọn và hiệu quả.
 
-【背景】
-预测条件: {simulation_requirement}
+【Bối cảnh】
+Điều kiện dự báo: {simulation_requirement}
 
-【已生成的分析报告】
+【Báo cáo phân tích đã được tạo】
 {report_content}
 
-【规则】
-1. 优先基于上述报告内容回答问题
-2. 直接回答问题，避免冗长的思考论述
-3. 仅在报告内容不足以回答时，才调用工具检索更多数据
-4. 回答要简洁、清晰、有条理
+【Quy tắc】
+1. Ưu tiên trả lời dựa trên nội dung báo cáo ở trên
+2. Trả lời trực tiếp câu hỏi, tránh diễn giải suy nghĩ dài dòng
+3. Chỉ khi nội dung báo cáo không đủ để trả lời mới gọi công cụ để truy xuất thêm dữ liệu
+4. Câu trả lời phải ngắn gọn, rõ ràng và có tổ chức
 
-【可用工具】（仅在需要时使用，最多调用1-2次）
+【Công cụ khả dụng】 (chỉ dùng khi cần, gọi tối đa 1-2 lần)
 {tools_description}
 
-【工具调用格式】
+【Định dạng gọi công cụ】
 <tool_call>
-{{"name": "工具名称", "parameters": {{"参数名": "参数值"}}}}
+{{"name": "tên_công_cụ", "parameters": {{"tên_tham_số": "giá_trị_tham_số"}}}}
 </tool_call>
 
-【回答风格】
-- 简洁直接，不要长篇大论
-- 使用 > 格式引用关键内容
-- 优先给出结论，再解释原因"""
+【Phong cách trả lời】
+- Ngắn gọn, trực tiếp, không dài dòng
+- Dùng định dạng `>` để trích dẫn nội dung quan trọng
+- Ưu tiên đưa ra kết luận trước, rồi mới giải thích nguyên nhân"""
 
-CHAT_OBSERVATION_SUFFIX = "\n\n请简洁回答问题。"
+CHAT_OBSERVATION_SUFFIX = "\n\nHãy trả lời câu hỏi một cách ngắn gọn."
 
 
 # ═══════════════════════════════════════════════════════════════
-# ReportAgent 主类
+# Lớp chính ReportAgent
 # ═══════════════════════════════════════════════════════════════
 
 
 class ReportAgent:
     """
-    Report Agent - 模拟报告生成Agent
+    Report Agent - Agent tạo báo cáo mô phỏng
 
-    采用ReACT（Reasoning + Acting）模式：
-    1. 规划阶段：分析模拟需求，规划报告目录结构
-    2. 生成阶段：逐章节生成内容，每章节可多次调用工具获取信息
-    3. 反思阶段：检查内容完整性和准确性
+    Áp dụng cơ chế ReACT (Reasoning + Acting):
+    1. Giai đoạn lập kế hoạch: phân tích yêu cầu mô phỏng, xây dựng cấu trúc mục lục báo cáo
+    2. Giai đoạn tạo nội dung: sinh nội dung theo từng chương, mỗi chương có thể gọi công cụ nhiều lần để lấy thông tin
+    3. Giai đoạn phản tư: kiểm tra tính đầy đủ và chính xác của nội dung
     """
 
-    # 最大工具调用次数（每个章节）
+    # Số lần gọi công cụ tối đa cho mỗi chương
     MAX_TOOL_CALLS_PER_SECTION = 5
 
-    # 最大反思轮数
+    # Số vòng phản tư tối đa
     MAX_REFLECTION_ROUNDS = 3
 
-    # 对话中的最大工具调用次数
+    # Số lần gọi công cụ tối đa trong hội thoại
     MAX_TOOL_CALLS_PER_CHAT = 2
 
     def __init__(
@@ -881,14 +880,14 @@ class ReportAgent:
         zep_tools: Optional[ZepToolsService] = None,
     ):
         """
-        初始化Report Agent
+        Khởi tạo Report Agent
 
         Args:
-            graph_id: 图谱ID
-            simulation_id: 模拟ID
-            simulation_requirement: 模拟需求描述
-            llm_client: LLM客户端（可选）
-            zep_tools: Zep工具服务（可选）
+            graph_id: ID đồ thị
+            simulation_id: ID mô phỏng
+            simulation_requirement: Mô tả yêu cầu mô phỏng
+            llm_client: Client LLM (tùy chọn)
+            zep_tools: Dịch vụ công cụ Zep (tùy chọn)
         """
         self.graph_id = graph_id
         self.simulation_id = simulation_id
@@ -897,51 +896,51 @@ class ReportAgent:
         self.llm = llm_client or LLMClient()
         self.zep_tools = zep_tools or ZepToolsService()
 
-        # 工具定义
+        # Định nghĩa công cụ
         self.tools = self._define_tools()
 
-        # 日志记录器（在 generate_report 中初始化）
+        # Bộ ghi nhật ký (khởi tạo trong generate_report)
         self.report_logger: Optional[ReportLogger] = None
-        # 控制台日志记录器（在 generate_report 中初始化）
+        # Bộ ghi nhật ký console (khởi tạo trong generate_report)
         self.console_logger: Optional[ReportConsoleLogger] = None
 
         logger.info(
-            f"ReportAgent 初始化完成: graph_id={graph_id}, simulation_id={simulation_id}"
+            f"Khởi tạo ReportAgent hoàn tất: graph_id={graph_id}, simulation_id={simulation_id}"
         )
 
     def _define_tools(self) -> Dict[str, Dict[str, Any]]:
-        """定义可用工具"""
+        """Định nghĩa các công cụ khả dụng."""
         return {
             "insight_forge": {
                 "name": "insight_forge",
                 "description": TOOL_DESC_INSIGHT_FORGE,
                 "parameters": {
-                    "query": "你想深入分析的问题或话题",
-                    "report_context": "当前报告章节的上下文（可选，有助于生成更精准的子问题）",
+                    "query": "Vấn đề hoặc chủ đề bạn muốn phân tích sâu",
+                    "report_context": "Ngữ cảnh của chương báo cáo hiện tại (tùy chọn, giúp tạo câu hỏi con chính xác hơn)",
                 },
             },
             "panorama_search": {
                 "name": "panorama_search",
                 "description": TOOL_DESC_PANORAMA_SEARCH,
                 "parameters": {
-                    "query": "搜索查询，用于相关性排序",
-                    "include_expired": "是否包含过期/历史内容（默认True）",
+                    "query": "Truy vấn tìm kiếm, dùng để sắp xếp theo độ liên quan",
+                    "include_expired": "Có bao gồm nội dung hết hiệu lực/lịch sử hay không (mặc định True)",
                 },
             },
             "quick_search": {
                 "name": "quick_search",
                 "description": TOOL_DESC_QUICK_SEARCH,
                 "parameters": {
-                    "query": "搜索查询字符串",
-                    "limit": "返回结果数量（可选，默认10）",
+                    "query": "Chuỗi truy vấn tìm kiếm",
+                    "limit": "Số lượng kết quả trả về (tùy chọn, mặc định 10)",
                 },
             },
             "interview_agents": {
                 "name": "interview_agents",
                 "description": TOOL_DESC_INTERVIEW_AGENTS,
                 "parameters": {
-                    "interview_topic": "采访主题或需求描述（如：'了解学生对宿舍甲醛事件的看法'）",
-                    "max_agents": "最多采访的Agent数量（可选，默认5，最大10）",
+                    "interview_topic": "Chủ đề hoặc mô tả nhu cầu phỏng vấn (ví dụ: 'Tìm hiểu quan điểm của sinh viên về sự cố formaldehyde trong ký túc xá')",
+                    "max_agents": "Số lượng Agent phỏng vấn tối đa (tùy chọn, mặc định 5, tối đa 10)",
                 },
             },
         }
@@ -950,17 +949,17 @@ class ReportAgent:
         self, tool_name: str, parameters: Dict[str, Any], report_context: str = ""
     ) -> str:
         """
-        执行工具调用
+        Thực thi lời gọi công cụ.
 
         Args:
-            tool_name: 工具名称
-            parameters: 工具参数
-            report_context: 报告上下文（用于InsightForge）
+            tool_name: Tên công cụ
+            parameters: Tham số công cụ
+            report_context: Ngữ cảnh báo cáo (dùng cho InsightForge)
 
         Returns:
-            工具执行结果（文本格式）
+            Kết quả thực thi công cụ (định dạng văn bản)
         """
-        logger.info(f"执行工具: {tool_name}, 参数: {parameters}")
+        logger.info(f"Thực thi công cụ: {tool_name}, tham số: {parameters}")
 
         try:
             if tool_name == "insight_forge":
@@ -975,7 +974,7 @@ class ReportAgent:
                 return result.to_text()
 
             elif tool_name == "panorama_search":
-                # 广度搜索 - 获取全貌
+                # Tìm kiếm diện rộng - lấy toàn cảnh
                 query = parameters.get("query", "")
                 include_expired = parameters.get("include_expired", True)
                 if isinstance(include_expired, str):
@@ -986,7 +985,7 @@ class ReportAgent:
                 return result.to_text()
 
             elif tool_name == "quick_search":
-                # 简单搜索 - 快速检索
+                # Tìm kiếm đơn giản - truy xuất nhanh
                 query = parameters.get("query", "")
                 limit = parameters.get("limit", 10)
                 if isinstance(limit, str):
@@ -997,7 +996,7 @@ class ReportAgent:
                 return result.to_text()
 
             elif tool_name == "interview_agents":
-                # 深度采访 - 调用真实的OASIS采访API获取模拟Agent的回答（双平台）
+                # Phỏng vấn chuyên sâu - gọi API phỏng vấn OASIS thật để lấy câu trả lời của Agent mô phỏng (hai nền tảng)
                 interview_topic = parameters.get(
                     "interview_topic", parameters.get("query", "")
                 )
@@ -1013,11 +1012,11 @@ class ReportAgent:
                 )
                 return result.to_text()
 
-            # ========== 向后兼容的旧工具（内部重定向到新工具） ==========
+            # ========== Công cụ cũ để tương thích ngược (chuyển hướng nội bộ sang công cụ mới) ==========
 
             elif tool_name == "search_graph":
-                # 重定向到 quick_search
-                logger.info("search_graph 已重定向到 quick_search")
+                # Chuyển hướng sang quick_search
+                logger.info("search_graph đã được chuyển hướng sang quick_search")
                 return self._execute_tool("quick_search", parameters, report_context)
 
             elif tool_name == "get_graph_statistics":
@@ -1032,8 +1031,10 @@ class ReportAgent:
                 return json.dumps(result, ensure_ascii=False, indent=2)
 
             elif tool_name == "get_simulation_context":
-                # 重定向到 insight_forge，因为它更强大
-                logger.info("get_simulation_context 已重定向到 insight_forge")
+                # Chuyển hướng sang insight_forge vì công cụ này mạnh hơn
+                logger.info(
+                    "get_simulation_context đã được chuyển hướng sang insight_forge"
+                )
                 query = parameters.get("query", self.simulation_requirement)
                 return self._execute_tool(
                     "insight_forge", {"query": query}, report_context
@@ -1048,13 +1049,13 @@ class ReportAgent:
                 return json.dumps(result, ensure_ascii=False, indent=2)
 
             else:
-                return f"未知工具: {tool_name}。请使用以下工具之一: insight_forge, panorama_search, quick_search"
+                return f"Công cụ không xác định: {tool_name}. Hãy dùng một trong các công cụ sau: insight_forge, panorama_search, quick_search"
 
         except Exception as e:
-            logger.error(f"工具执行失败: {tool_name}, 错误: {str(e)}")
-            return f"工具执行失败: {str(e)}"
+            logger.error(f"Thực thi công cụ thất bại: {tool_name}, lỗi: {str(e)}")
+            return f"Thực thi công cụ thất bại: {str(e)}"
 
-    # 合法的工具名称集合，用于裸 JSON 兜底解析时校验
+    # Tập tên công cụ hợp lệ, dùng để kiểm tra khi parse JSON thuần
     VALID_TOOL_NAMES = {
         "insight_forge",
         "panorama_search",
@@ -1064,15 +1065,15 @@ class ReportAgent:
 
     def _parse_tool_calls(self, response: str) -> List[Dict[str, Any]]:
         """
-        从LLM响应中解析工具调用
+        Phân tích lời gọi công cụ từ phản hồi của LLM.
 
-        支持的格式（按优先级）：
+        Các định dạng được hỗ trợ (theo thứ tự ưu tiên):
         1. <tool_call>{"name": "tool_name", "parameters": {...}}</tool_call>
-        2. 裸 JSON（响应整体或单行就是一个工具调用 JSON）
+        2. JSON thuần (toàn bộ phản hồi hoặc một dòng là JSON lời gọi công cụ)
         """
         tool_calls = []
 
-        # 格式1: XML风格（标准格式）
+        # Định dạng 1: kiểu XML (định dạng chuẩn)
         xml_pattern = r"<tool_call>\s*(\{.*?\})\s*</tool_call>"
         for match in re.finditer(xml_pattern, response, re.DOTALL):
             try:
@@ -1084,8 +1085,8 @@ class ReportAgent:
         if tool_calls:
             return tool_calls
 
-        # 格式2: 兜底 - LLM 直接输出裸 JSON（没包 <tool_call> 标签）
-        # 只在格式1未匹配时尝试，避免误匹配正文中的 JSON
+        # Định dạng 2: phương án dự phòng - LLM xuất JSON thuần trực tiếp (không bọc trong thẻ <tool_call>)
+        # Chỉ thử khi định dạng 1 không khớp để tránh nhận nhầm JSON trong phần nội dung
         stripped = response.strip()
         if stripped.startswith("{") and stripped.endswith("}"):
             try:
@@ -1096,7 +1097,7 @@ class ReportAgent:
             except json.JSONDecodeError:
                 pass
 
-        # 响应可能包含思考文字 + 裸 JSON，尝试提取最后一个 JSON 对象
+        # Phản hồi có thể chứa phần suy nghĩ + JSON thuần, thử trích xuất đối tượng JSON cuối cùng
         json_pattern = r'(\{"(?:name|tool)"\s*:.*?\})\s*$'
         match = re.search(json_pattern, stripped, re.DOTALL)
         if match:
@@ -1110,11 +1111,11 @@ class ReportAgent:
         return tool_calls
 
     def _is_valid_tool_call(self, data: dict) -> bool:
-        """校验解析出的 JSON 是否是合法的工具调用"""
-        # 支持 {"name": ..., "parameters": ...} 和 {"tool": ..., "params": ...} 两种键名
+        """Kiểm tra JSON đã parse có phải lời gọi công cụ hợp lệ hay không."""
+        # Hỗ trợ hai kiểu khóa: {"name": ..., "parameters": ...} và {"tool": ..., "params": ...}
         tool_name = data.get("name") or data.get("tool")
         if tool_name and tool_name in self.VALID_TOOL_NAMES:
-            # 统一键名为 name / parameters
+            # Chuẩn hóa tên khóa thành name / parameters
             if "tool" in data:
                 data["name"] = data.pop("tool")
             if "params" in data and "parameters" not in data:
@@ -1123,43 +1124,43 @@ class ReportAgent:
         return False
 
     def _get_tools_description(self) -> str:
-        """生成工具描述文本"""
-        desc_parts = ["可用工具："]
+        """Tạo văn bản mô tả công cụ."""
+        desc_parts = ["Công cụ khả dụng:"]
         for name, tool in self.tools.items():
             params_desc = ", ".join(
                 [f"{k}: {v}" for k, v in tool["parameters"].items()]
             )
             desc_parts.append(f"- {name}: {tool['description']}")
             if params_desc:
-                desc_parts.append(f"  参数: {params_desc}")
+                desc_parts.append(f"  Tham số: {params_desc}")
         return "\n".join(desc_parts)
 
     def plan_outline(
         self, progress_callback: Optional[Callable] = None
     ) -> ReportOutline:
         """
-        规划报告大纲
+        Lập đề cương báo cáo.
 
-        使用LLM分析模拟需求，规划报告的目录结构
+        Sử dụng LLM để phân tích yêu cầu mô phỏng và xây dựng cấu trúc mục lục báo cáo.
 
         Args:
-            progress_callback: 进度回调函数
+            progress_callback: Hàm callback tiến độ
 
         Returns:
-            ReportOutline: 报告大纲
+            ReportOutline: Đề cương báo cáo
         """
-        logger.info("开始规划报告大纲...")
+        logger.info("Bắt đầu lập đề cương báo cáo...")
 
         if progress_callback:
-            progress_callback("planning", 0, "正在分析模拟需求...")
+            progress_callback("planning", 0, "Đang phân tích yêu cầu mô phỏng...")
 
-        # 首先获取模拟上下文
+        # Trước tiên lấy ngữ cảnh mô phỏng
         context = self.zep_tools.get_simulation_context(
             graph_id=self.graph_id, simulation_requirement=self.simulation_requirement
         )
 
         if progress_callback:
-            progress_callback("planning", 30, "正在生成报告大纲...")
+            progress_callback("planning", 30, "Đang tạo đề cương báo cáo...")
 
         system_prompt = PLAN_SYSTEM_PROMPT
         user_prompt = PLAN_USER_PROMPT_TEMPLATE.format(
@@ -1185,9 +1186,9 @@ class ReportAgent:
             )
 
             if progress_callback:
-                progress_callback("planning", 80, "正在解析大纲结构...")
+                progress_callback("planning", 80, "Đang phân tích cấu trúc đề cương...")
 
-            # 解析大纲
+            # Phân tích đề cương
             sections = []
             for section_data in response.get("sections", []):
                 sections.append(
@@ -1195,27 +1196,27 @@ class ReportAgent:
                 )
 
             outline = ReportOutline(
-                title=response.get("title", "模拟分析报告"),
+                title=response.get("title", "Báo cáo phân tích mô phỏng"),
                 summary=response.get("summary", ""),
                 sections=sections,
             )
 
             if progress_callback:
-                progress_callback("planning", 100, "大纲规划完成")
+                progress_callback("planning", 100, "Hoàn tất lập đề cương")
 
-            logger.info(f"大纲规划完成: {len(sections)} 个章节")
+            logger.info(f"Lập đề cương hoàn tất: {len(sections)} chương")
             return outline
 
         except Exception as e:
-            logger.error(f"大纲规划失败: {str(e)}")
-            # 返回默认大纲（3个章节，作为fallback）
+            logger.error(f"Lập đề cương thất bại: {str(e)}")
+            # Trả về đề cương mặc định (3 chương) như phương án dự phòng
             return ReportOutline(
-                title="未来预测报告",
-                summary="基于模拟预测的未来趋势与风险分析",
+                title="Báo cáo dự báo tương lai",
+                summary="Phân tích xu hướng và rủi ro tương lai dựa trên dự báo mô phỏng",
                 sections=[
-                    ReportSection(title="预测场景与核心发现"),
-                    ReportSection(title="人群行为预测分析"),
-                    ReportSection(title="趋势展望与风险提示"),
+                    ReportSection(title="Bối cảnh dự báo và phát hiện cốt lõi"),
+                    ReportSection(title="Phân tích dự báo hành vi các nhóm người"),
+                    ReportSection(title="Triển vọng xu hướng và cảnh báo rủi ro"),
                 ],
             )
 
@@ -1228,28 +1229,28 @@ class ReportAgent:
         section_index: int = 0,
     ) -> str:
         """
-        使用ReACT模式生成单个章节内容
+        Tạo nội dung cho một chương bằng cơ chế ReACT.
 
-        ReACT循环：
-        1. Thought（思考）- 分析需要什么信息
-        2. Action（行动）- 调用工具获取信息
-        3. Observation（观察）- 分析工具返回结果
-        4. 重复直到信息足够或达到最大次数
-        5. Final Answer（最终回答）- 生成章节内容
+        Vòng lặp ReACT:
+        1. Thought (suy nghĩ) - phân tích cần thông tin gì
+        2. Action (hành động) - gọi công cụ để lấy thông tin
+        3. Observation (quan sát) - phân tích kết quả công cụ trả về
+        4. Lặp lại cho tới khi đủ thông tin hoặc chạm ngưỡng tối đa
+        5. Final Answer (câu trả lời cuối cùng) - tạo nội dung chương
 
         Args:
-            section: 要生成的章节
-            outline: 完整大纲
-            previous_sections: 之前章节的内容（用于保持连贯性）
-            progress_callback: 进度回调
-            section_index: 章节索引（用于日志记录）
+            section: Chương cần tạo
+            outline: Đề cương đầy đủ
+            previous_sections: Nội dung các chương trước đó (để giữ tính liên kết)
+            progress_callback: Callback tiến độ
+            section_index: Chỉ số chương (dùng cho ghi log)
 
         Returns:
-            章节内容（Markdown格式）
+            Nội dung chương (định dạng Markdown)
         """
-        logger.info(f"ReACT生成章节: {section.title}")
+        logger.info(f"Tạo chương bằng ReACT: {section.title}")
 
-        # 记录章节开始日志
+        # Ghi log bắt đầu chương
         if self.report_logger:
             self.report_logger.log_section_start(section.title, section_index)
 
@@ -1261,16 +1262,16 @@ class ReportAgent:
             tools_description=self._get_tools_description(),
         )
 
-        # 构建用户prompt - 每个已完成章节各传入最大4000字
+        # Tạo prompt người dùng - mỗi chương đã hoàn thành truyền tối đa 4000 ký tự
         if previous_sections:
             previous_parts = []
             for sec in previous_sections:
-                # 每个章节最多4000字
+                # Mỗi chương tối đa 4000 ký tự
                 truncated = sec[:4000] + "..." if len(sec) > 4000 else sec
                 previous_parts.append(truncated)
             previous_content = "\n\n---\n\n".join(previous_parts)
         else:
-            previous_content = "（这是第一个章节）"
+            previous_content = "(Đây là chương đầu tiên)"
 
         user_prompt = SECTION_USER_PROMPT_TEMPLATE.format(
             previous_content=previous_content,
@@ -1282,12 +1283,14 @@ class ReportAgent:
             {"role": "user", "content": user_prompt},
         ]
 
-        # ReACT循环
+        # Vòng lặp ReACT
         tool_calls_count = 0
-        max_iterations = 5  # 最大迭代轮数
-        min_tool_calls = 3  # 最少工具调用次数
-        conflict_retries = 0  # 工具调用与Final Answer同时出现的连续冲突次数
-        used_tools = set()  # 记录已调用过的工具名
+        max_iterations = 5  # Số vòng lặp tối đa
+        min_tool_calls = 3  # Số lần gọi công cụ tối thiểu
+        conflict_retries = (
+            0  # Số lần xung đột liên tiếp khi vừa có tool call vừa có Final Answer
+        )
+        used_tools = set()  # Ghi nhận các công cụ đã dùng
         all_tools = {
             "insight_forge",
             "panorama_search",
@@ -1295,73 +1298,73 @@ class ReportAgent:
             "interview_agents",
         }
 
-        # 报告上下文，用于InsightForge的子问题生成
-        report_context = (
-            f"章节标题: {section.title}\n模拟需求: {self.simulation_requirement}"
-        )
+        # Ngữ cảnh báo cáo, dùng để sinh câu hỏi con cho InsightForge
+        report_context = f"Tiêu đề chương: {section.title}\nYêu cầu mô phỏng: {self.simulation_requirement}"
 
         for iteration in range(max_iterations):
             if progress_callback:
                 progress_callback(
                     "generating",
                     int((iteration / max_iterations) * 100),
-                    f"深度检索与撰写中 ({tool_calls_count}/{self.MAX_TOOL_CALLS_PER_SECTION})",
+                    f"Đang truy xuất sâu và biên soạn ({tool_calls_count}/{self.MAX_TOOL_CALLS_PER_SECTION})",
                 )
 
-            # 调用LLM
+            # Gọi LLM
             response = self.llm.chat(
                 messages=messages, temperature=0.5, max_tokens=4096
             )
 
-            # 检查 LLM 返回是否为 None（API 异常或内容为空）
+            # Kiểm tra LLM có trả về None hay không (API lỗi hoặc nội dung rỗng)
             if response is None:
                 logger.warning(
-                    f"章节 {section.title} 第 {iteration + 1} 次迭代: LLM 返回 None"
+                    f"Chương {section.title} vòng lặp thứ {iteration + 1}: LLM trả về None"
                 )
-                # 如果还有迭代次数，添加消息并重试
+                # Nếu vẫn còn lượt lặp, thêm thông điệp rồi thử lại
                 if iteration < max_iterations - 1:
-                    messages.append({"role": "assistant", "content": "（响应为空）"})
-                    messages.append({"role": "user", "content": "请继续生成内容。"})
+                    messages.append({"role": "assistant", "content": "(Phản hồi rỗng)"})
+                    messages.append(
+                        {"role": "user", "content": "Hãy tiếp tục tạo nội dung."}
+                    )
                     continue
-                # 最后一次迭代也返回 None，跳出循环进入强制收尾
+                # Nếu lượt cuối vẫn trả về None thì thoát vòng lặp để ép kết thúc
                 break
 
-            logger.debug(f"LLM响应: {response[:200]}...")
+            logger.debug(f"Phản hồi từ LLM: {response[:200]}...")
 
-            # 解析一次，复用结果
+            # Phân tích một lần để tái sử dụng kết quả
             tool_calls = self._parse_tool_calls(response)
             has_tool_calls = bool(tool_calls)
             has_final_answer = "Final Answer:" in response
 
-            # ── 冲突处理：LLM 同时输出了工具调用和 Final Answer ──
+            # ── Xử lý xung đột: LLM đồng thời xuất lời gọi công cụ và Final Answer ──
             if has_tool_calls and has_final_answer:
                 conflict_retries += 1
                 logger.warning(
-                    f"章节 {section.title} 第 {iteration + 1} 轮: "
-                    f"LLM 同时输出工具调用和 Final Answer（第 {conflict_retries} 次冲突）"
+                    f"Chương {section.title} lượt {iteration + 1}: "
+                    f"LLM đồng thời xuất tool call và Final Answer (xung đột lần {conflict_retries})"
                 )
 
                 if conflict_retries <= 2:
-                    # 前两次：丢弃本次响应，要求 LLM 重新回复
+                    # Hai lần đầu: bỏ phản hồi này và yêu cầu LLM trả lời lại
                     messages.append({"role": "assistant", "content": response})
                     messages.append(
                         {
                             "role": "user",
                             "content": (
-                                "【格式错误】你在一次回复中同时包含了工具调用和 Final Answer，这是不允许的。\n"
-                                "每次回复只能做以下两件事之一：\n"
-                                "- 调用一个工具（输出一个 <tool_call> 块，不要写 Final Answer）\n"
-                                "- 输出最终内容（以 'Final Answer:' 开头，不要包含 <tool_call>）\n"
-                                "请重新回复，只做其中一件事。"
+                                "【Lỗi định dạng】Trong một phản hồi bạn đã đồng thời chứa tool call và Final Answer, điều này không được phép.\n"
+                                "Mỗi phản hồi chỉ được làm đúng một trong hai việc sau:\n"
+                                "- Gọi một công cụ (xuất một khối <tool_call>, không viết Final Answer)\n"
+                                "- Xuất nội dung cuối cùng (bắt đầu bằng 'Final Answer:', không chứa <tool_call>)\n"
+                                "Hãy trả lời lại và chỉ làm một việc duy nhất."
                             ),
                         }
                     )
                     continue
                 else:
-                    # 第三次：降级处理，截断到第一个工具调用，强制执行
+                    # Lần thứ ba: hạ cấp xử lý, cắt tới tool call đầu tiên và buộc thực thi
                     logger.warning(
-                        f"章节 {section.title}: 连续 {conflict_retries} 次冲突，"
-                        "降级为截断执行第一个工具调用"
+                        f"Chương {section.title}: xung đột liên tiếp {conflict_retries} lần, "
+                        "hạ cấp thành cắt và thực thi tool call đầu tiên"
                     )
                     first_tool_end = response.find("</tool_call>")
                     if first_tool_end != -1:
@@ -1371,7 +1374,7 @@ class ReportAgent:
                     has_final_answer = False
                     conflict_retries = 0
 
-            # 记录 LLM 响应日志
+            # Ghi log phản hồi của LLM
             if self.report_logger:
                 self.report_logger.log_llm_response(
                     section_title=section.title,
@@ -1382,14 +1385,14 @@ class ReportAgent:
                     has_final_answer=has_final_answer,
                 )
 
-            # ── 情况1：LLM 输出了 Final Answer ──
+            # ── Trường hợp 1: LLM xuất Final Answer ──
             if has_final_answer:
-                # 工具调用次数不足，拒绝并要求继续调工具
+                # Số lần gọi công cụ chưa đủ, từ chối và yêu cầu gọi thêm công cụ
                 if tool_calls_count < min_tool_calls:
                     messages.append({"role": "assistant", "content": response})
                     unused_tools = all_tools - used_tools
                     unused_hint = (
-                        f"（这些工具还未使用，推荐用一下他们: {', '.join(unused_tools)}）"
+                        f"(Các công cụ này vẫn chưa được dùng, nên cân nhắc dùng thử: {', '.join(unused_tools)})"
                         if unused_tools
                         else ""
                     )
@@ -1405,10 +1408,10 @@ class ReportAgent:
                     )
                     continue
 
-                # 正常结束
+                # Kết thúc bình thường
                 final_answer = response.split("Final Answer:")[-1].strip()
                 logger.info(
-                    f"章节 {section.title} 生成完成（工具调用: {tool_calls_count}次）"
+                    f"Đã tạo xong chương {section.title} (gọi công cụ: {tool_calls_count} lần)"
                 )
 
                 if self.report_logger:
@@ -1420,9 +1423,9 @@ class ReportAgent:
                     )
                 return final_answer
 
-            # ── 情况2：LLM 尝试调用工具 ──
+            # ── Trường hợp 2: LLM cố gắng gọi công cụ ──
             if has_tool_calls:
-                # 工具额度已耗尽 → 明确告知，要求输出 Final Answer
+                # Đã hết lượt gọi công cụ -> thông báo rõ và yêu cầu xuất Final Answer
                 if tool_calls_count >= self.MAX_TOOL_CALLS_PER_SECTION:
                     messages.append({"role": "assistant", "content": response})
                     messages.append(
@@ -1436,11 +1439,11 @@ class ReportAgent:
                     )
                     continue
 
-                # 只执行第一个工具调用
+                # Chỉ thực thi lời gọi công cụ đầu tiên
                 call = tool_calls[0]
                 if len(tool_calls) > 1:
                     logger.info(
-                        f"LLM 尝试调用 {len(tool_calls)} 个工具，只执行第一个: {call['name']}"
+                        f"LLM cố gọi {len(tool_calls)} công cụ, chỉ thực thi công cụ đầu tiên: {call['name']}"
                     )
 
                 if self.report_logger:
@@ -1470,7 +1473,7 @@ class ReportAgent:
                 tool_calls_count += 1
                 used_tools.add(call["name"])
 
-                # 构建未使用工具提示
+                # Tạo gợi ý về các công cụ chưa dùng
                 unused_tools = all_tools - used_tools
                 unused_hint = ""
                 if unused_tools and tool_calls_count < self.MAX_TOOL_CALLS_PER_SECTION:
@@ -1494,14 +1497,14 @@ class ReportAgent:
                 )
                 continue
 
-            # ── 情况3：既没有工具调用，也没有 Final Answer ──
+            # ── Trường hợp 3: không có tool call và cũng không có Final Answer ──
             messages.append({"role": "assistant", "content": response})
 
             if tool_calls_count < min_tool_calls:
-                # 工具调用次数不足，推荐未用过的工具
+                # Số lần gọi công cụ chưa đủ, gợi ý các công cụ chưa dùng
                 unused_tools = all_tools - used_tools
                 unused_hint = (
-                    f"（这些工具还未使用，推荐用一下他们: {', '.join(unused_tools)}）"
+                    f"(Các công cụ này vẫn chưa được dùng, nên cân nhắc dùng thử: {', '.join(unused_tools)})"
                     if unused_tools
                     else ""
                 )
@@ -1518,10 +1521,10 @@ class ReportAgent:
                 )
                 continue
 
-            # 工具调用已足够，LLM 输出了内容但没带 "Final Answer:" 前缀
-            # 直接将这段内容作为最终答案，不再空转
+            # Đã gọi đủ công cụ, LLM có xuất nội dung nhưng thiếu tiền tố "Final Answer:"
+            # Dùng trực tiếp đoạn này làm câu trả lời cuối cùng để tránh lặp vô ích
             logger.info(
-                f"章节 {section.title} 未检测到 'Final Answer:' 前缀，直接采纳LLM输出作为最终内容（工具调用: {tool_calls_count}次）"
+                f"Chương {section.title} không có tiền tố 'Final Answer:', dùng trực tiếp đầu ra của LLM làm nội dung cuối cùng (gọi công cụ: {tool_calls_count} lần)"
             )
             final_answer = response.strip()
 
@@ -1534,24 +1537,28 @@ class ReportAgent:
                 )
             return final_answer
 
-        # 达到最大迭代次数，强制生成内容
-        logger.warning(f"章节 {section.title} 达到最大迭代次数，强制生成")
+        # Đã chạm số vòng lặp tối đa, buộc tạo nội dung
+        logger.warning(
+            f"Chương {section.title} đã chạm số vòng lặp tối đa, buộc tạo nội dung"
+        )
         messages.append({"role": "user", "content": REACT_FORCE_FINAL_MSG})
 
         response = self.llm.chat(messages=messages, temperature=0.5, max_tokens=4096)
 
-        # 检查强制收尾时 LLM 返回是否为 None
+        # Kiểm tra khi ép kết thúc thì LLM có trả về None hay không
         if response is None:
             logger.error(
-                f"章节 {section.title} 强制收尾时 LLM 返回 None，使用默认错误提示"
+                f"Khi ép kết thúc chương {section.title}, LLM trả về None; sẽ dùng thông báo lỗi mặc định"
             )
-            final_answer = f"（本章节生成失败：LLM 返回空响应，请稍后重试）"
+            final_answer = (
+                f"(Tạo chương thất bại: LLM trả về phản hồi rỗng, vui lòng thử lại sau)"
+            )
         elif "Final Answer:" in response:
             final_answer = response.split("Final Answer:")[-1].strip()
         else:
             final_answer = response
 
-        # 记录章节内容生成完成日志
+        # Ghi log hoàn tất tạo nội dung chương
         if self.report_logger:
             self.report_logger.log_section_content(
                 section_title=section.title,
@@ -1568,29 +1575,29 @@ class ReportAgent:
         report_id: Optional[str] = None,
     ) -> Report:
         """
-        生成完整报告（分章节实时输出）
+        Tạo báo cáo hoàn chỉnh (xuất theo từng chương theo thời gian thực).
 
-        每个章节生成完成后立即保存到文件夹，不需要等待整个报告完成。
-        文件结构：
+        Mỗi chương sẽ được lưu ngay sau khi tạo xong, không cần chờ toàn bộ báo cáo hoàn tất.
+        Cấu trúc thư mục:
         reports/{report_id}/
-            meta.json       - 报告元信息
-            outline.json    - 报告大纲
-            progress.json   - 生成进度
-            section_01.md   - 第1章节
-            section_02.md   - 第2章节
+            meta.json       - Siêu dữ liệu báo cáo
+            outline.json    - Đề cương báo cáo
+            progress.json   - Tiến độ tạo báo cáo
+            section_01.md   - Chương 1
+            section_02.md   - Chương 2
             ...
-            full_report.md  - 完整报告
+            full_report.md  - Báo cáo hoàn chỉnh
 
         Args:
-            progress_callback: 进度回调函数 (stage, progress, message)
-            report_id: 报告ID（可选，如果不传则自动生成）
+            progress_callback: Hàm callback tiến độ (stage, progress, message)
+            report_id: ID báo cáo (tùy chọn, nếu không truyền sẽ tự tạo)
 
         Returns:
-            Report: 完整报告
+            Report: Báo cáo hoàn chỉnh
         """
         import uuid
 
-        # 如果没有传入 report_id，则自动生成
+        # Nếu không truyền report_id thì tự động tạo
         if not report_id:
             report_id = f"report_{uuid.uuid4().hex[:12]}"
         start_time = datetime.now()
@@ -1604,14 +1611,14 @@ class ReportAgent:
             created_at=datetime.now().isoformat(),
         )
 
-        # 已完成的章节标题列表（用于进度追踪）
+        # Danh sách tiêu đề các chương đã hoàn thành (dùng để theo dõi tiến độ)
         completed_section_titles = []
 
         try:
-            # 初始化：创建报告文件夹并保存初始状态
+            # Khởi tạo: tạo thư mục báo cáo và lưu trạng thái ban đầu
             ReportManager._ensure_report_folder(report_id)
 
-            # 初始化日志记录器（结构化日志 agent_log.jsonl）
+            # Khởi tạo bộ ghi log (log có cấu trúc `agent_log.jsonl`)
             self.report_logger = ReportLogger(report_id)
             self.report_logger.log_start(
                 simulation_id=self.simulation_id,
@@ -1619,25 +1626,34 @@ class ReportAgent:
                 simulation_requirement=self.simulation_requirement,
             )
 
-            # 初始化控制台日志记录器（console_log.txt）
+            # Khởi tạo bộ ghi log console (`console_log.txt`)
             self.console_logger = ReportConsoleLogger(report_id)
 
             ReportManager.update_progress(
-                report_id, "pending", 0, "初始化报告...", completed_sections=[]
+                report_id,
+                "pending",
+                0,
+                "Đang khởi tạo báo cáo...",
+                completed_sections=[],
             )
             ReportManager.save_report(report)
 
-            # 阶段1: 规划大纲
+            # Giai đoạn 1: lập đề cương
             report.status = ReportStatus.PLANNING
             ReportManager.update_progress(
-                report_id, "planning", 5, "开始规划报告大纲...", completed_sections=[]
+                report_id,
+                "planning",
+                5,
+                "Bắt đầu lập đề cương báo cáo...",
+                completed_sections=[],
             )
+            ReportManager.save_report(report)
 
-            # 记录规划开始日志
+            # Ghi log bắt đầu lập kế hoạch
             self.report_logger.log_planning_start()
 
             if progress_callback:
-                progress_callback("planning", 0, "开始规划报告大纲...")
+                progress_callback("planning", 0, "Bắt đầu lập đề cương báo cáo...")
 
             outline = self.plan_outline(
                 progress_callback=lambda stage, prog, msg: (
@@ -1648,38 +1664,39 @@ class ReportAgent:
             )
             report.outline = outline
 
-            # 记录规划完成日志
+            # Ghi log hoàn tất lập kế hoạch
             self.report_logger.log_planning_complete(outline.to_dict())
 
-            # 保存大纲到文件
+            # Lưu đề cương vào tệp
             ReportManager.save_outline(report_id, outline)
             ReportManager.update_progress(
                 report_id,
                 "planning",
                 15,
-                f"大纲规划完成，共{len(outline.sections)}个章节",
+                f"Lập đề cương hoàn tất, tổng cộng {len(outline.sections)} chương",
                 completed_sections=[],
             )
             ReportManager.save_report(report)
 
-            logger.info(f"大纲已保存到文件: {report_id}/outline.json")
+            logger.info(f"Đề cương đã được lưu vào tệp: {report_id}/outline.json")
 
-            # 阶段2: 逐章节生成（分章节保存）
+            # Giai đoạn 2: tạo lần lượt từng chương (lưu theo từng chương)
             report.status = ReportStatus.GENERATING
+            ReportManager.save_report(report)
 
             total_sections = len(outline.sections)
-            generated_sections = []  # 保存内容用于上下文
+            generated_sections = []  # Lưu nội dung để làm ngữ cảnh
 
             for i, section in enumerate(outline.sections):
                 section_num = i + 1
                 base_progress = 20 + int((i / total_sections) * 70)
 
-                # 更新进度
+                # Cập nhật tiến độ
                 ReportManager.update_progress(
                     report_id,
                     "generating",
                     base_progress,
-                    f"正在生成章节: {section.title} ({section_num}/{total_sections})",
+                    f"Đang tạo chương: {section.title} ({section_num}/{total_sections})",
                     current_section=section.title,
                     completed_sections=completed_section_titles,
                 )
@@ -1688,10 +1705,10 @@ class ReportAgent:
                     progress_callback(
                         "generating",
                         base_progress,
-                        f"正在生成章节: {section.title} ({section_num}/{total_sections})",
+                        f"Đang tạo chương: {section.title} ({section_num}/{total_sections})",
                     )
 
-                # 生成主章节内容
+                # Tạo nội dung chính của chương
                 section_content = self._generate_section_react(
                     section=section,
                     outline=outline,
@@ -1709,11 +1726,12 @@ class ReportAgent:
                 section.content = section_content
                 generated_sections.append(f"## {section.title}\n\n{section_content}")
 
-                # 保存章节
+                # Lưu chương
                 ReportManager.save_section(report_id, section_num, section)
                 completed_section_titles.append(section.title)
+                ReportManager.save_report(report)
 
-                # 记录章节完成日志
+                # Ghi log hoàn tất chương
                 full_section_content = f"## {section.title}\n\n{section_content}"
 
                 if self.report_logger:
@@ -1723,62 +1741,66 @@ class ReportAgent:
                         full_content=full_section_content.strip(),
                     )
 
-                logger.info(f"章节已保存: {report_id}/section_{section_num:02d}.md")
+                logger.info(
+                    f"Chương đã được lưu: {report_id}/section_{section_num:02d}.md"
+                )
 
-                # 更新进度
+                # Cập nhật tiến độ
                 ReportManager.update_progress(
                     report_id,
                     "generating",
                     base_progress + int(70 / total_sections),
-                    f"章节 {section.title} 已完成",
+                    f"Chương {section.title} đã hoàn thành",
                     current_section=None,
                     completed_sections=completed_section_titles,
                 )
 
-            # 阶段3: 组装完整报告
+            # Giai đoạn 3: lắp ráp báo cáo hoàn chỉnh
             if progress_callback:
-                progress_callback("generating", 95, "正在组装完整报告...")
+                progress_callback(
+                    "generating", 95, "Đang lắp ráp báo cáo hoàn chỉnh..."
+                )
 
             ReportManager.update_progress(
                 report_id,
                 "generating",
                 95,
-                "正在组装完整报告...",
+                "Đang lắp ráp báo cáo hoàn chỉnh...",
                 completed_sections=completed_section_titles,
             )
 
-            # 使用ReportManager组装完整报告
+            # Dùng ReportManager để lắp ráp báo cáo hoàn chỉnh
             report.markdown_content = ReportManager.assemble_full_report(
                 report_id, outline
             )
             report.status = ReportStatus.COMPLETED
             report.completed_at = datetime.now().isoformat()
 
-            # 计算总耗时
+            # Tính tổng thời gian thực hiện
             total_time_seconds = (datetime.now() - start_time).total_seconds()
 
-            # 记录报告完成日志
+            # Ghi log hoàn tất báo cáo
             if self.report_logger:
                 self.report_logger.log_report_complete(
                     total_sections=total_sections, total_time_seconds=total_time_seconds
                 )
 
-            # 保存最终报告
+            # Lưu báo cáo cuối cùng
             ReportManager.save_report(report)
             ReportManager.update_progress(
                 report_id,
                 "completed",
                 100,
-                "报告生成完成",
+                "Đã tạo xong báo cáo",
                 completed_sections=completed_section_titles,
             )
 
             if progress_callback:
-                progress_callback("completed", 100, "报告生成完成")
+                progress_callback("completed", 100, "Đã tạo xong báo cáo")
 
-            logger.info(f"报告生成完成: {report_id}")
+            logger.info(f"Đã tạo xong báo cáo: {report_id}")
 
-            # 关闭控制台日志记录器
+            # Đóng bộ ghi log console
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
@@ -1786,28 +1808,28 @@ class ReportAgent:
             return report
 
         except Exception as e:
-            logger.error(f"报告生成失败: {str(e)}")
+            logger.error(f"Tạo báo cáo thất bại: {str(e)}")
             report.status = ReportStatus.FAILED
             report.error = str(e)
 
-            # 记录错误日志
+            # Ghi log lỗi
             if self.report_logger:
                 self.report_logger.log_error(str(e), "failed")
 
-            # 保存失败状态
+            # Lưu trạng thái thất bại
             try:
                 ReportManager.save_report(report)
                 ReportManager.update_progress(
                     report_id,
                     "failed",
                     -1,
-                    f"报告生成失败: {str(e)}",
+                    f"Tạo báo cáo thất bại: {str(e)}",
                     completed_sections=completed_section_titles,
                 )
             except Exception:
-                pass  # 忽略保存失败的错误
+                pass  # Bỏ qua lỗi khi lưu trạng thái thất bại
 
-            # 关闭控制台日志记录器
+            # Đóng bộ ghi log console
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
@@ -2505,6 +2527,18 @@ class ReportManager:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        # Ưu tiên trạng thái mới hơn từ progress.json khi meta.json chưa kịp được cập nhật.
+        effective_status = data.get("status", ReportStatus.PENDING.value)
+        progress_data = cls.get_progress(report_id)
+        if progress_data:
+            progress_status = progress_data.get("status")
+            valid_statuses = {status.value for status in ReportStatus}
+            if (
+                progress_status in valid_statuses
+                and effective_status not in {ReportStatus.COMPLETED.value, ReportStatus.FAILED.value}
+            ):
+                effective_status = progress_status
+
         # 重建Report对象
         outline = None
         if data.get("outline"):
@@ -2533,7 +2567,7 @@ class ReportManager:
             simulation_id=data["simulation_id"],
             graph_id=data["graph_id"],
             simulation_requirement=data["simulation_requirement"],
-            status=ReportStatus(data["status"]),
+            status=ReportStatus(effective_status),
             outline=outline,
             markdown_content=markdown_content,
             created_at=data.get("created_at", ""),

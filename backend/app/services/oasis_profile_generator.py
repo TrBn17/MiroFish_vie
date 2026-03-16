@@ -8,8 +8,11 @@ Cai tien chinh:
 3. Phan biet thuc the ca nhan va thuc the nhom/truu tuong.
 """
 
+import ast
 import json
+import os
 import random
+import re
 import time
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
@@ -19,10 +22,77 @@ from openai import OpenAI
 from zep_cloud.client import Zep
 
 from ..config import Config
+from ..utils.llm_client import sanitize_llm_payload, is_unrecoverable_llm_request_error
 from ..utils.logger import get_logger
 from .zep_entity_reader import EntityNode, ZepEntityReader
 
 logger = get_logger('mirofish.oasis_profile')
+
+
+def _atomic_write_json(file_path: str, payload: Any) -> None:
+    """Write JSON atomically so readers never observe a half-written file."""
+    tmp_path = f"{file_path}.tmp"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, file_path)
+
+
+def _atomic_write_csv(file_path: str, rows: List[Dict[str, Any]], fieldnames: List[str]) -> None:
+    """Write CSV atomically so readers never observe a half-written file."""
+    import csv
+
+    tmp_path = f"{file_path}.tmp"
+    with open(tmp_path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, file_path)
+
+
+def normalize_interested_topics(value: Any) -> List[str]:
+    """Normalize topic payloads so the UI always receives a list of readable strings."""
+    if value is None:
+        return []
+
+    if isinstance(value, (list, tuple, set)):
+        normalized: List[str] = []
+        seen = set()
+        for item in value:
+            text = str(item).strip()
+            if not text or text in seen:
+                continue
+            normalized.append(text)
+            seen.add(text)
+        return normalized
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+
+        if text[0] in "[(" and text[-1] in "])":
+            for parser in (json.loads, ast.literal_eval):
+                try:
+                    parsed = parser(text)
+                except (json.JSONDecodeError, ValueError, SyntaxError, TypeError):
+                    continue
+                if isinstance(parsed, (list, tuple, set)):
+                    return normalize_interested_topics(list(parsed))
+                if isinstance(parsed, str):
+                    return normalize_interested_topics(parsed)
+
+        if any(separator in text for separator in [",", ";", "|", "\n", "\r"]):
+            parts = re.split(r"[\n\r,;|]+", text)
+            return normalize_interested_topics(parts)
+
+        return [text]
+
+    text = str(value).strip()
+    return [text] if text else []
 
 
 @dataclass
@@ -56,6 +126,9 @@ class OasisAgentProfile:
     source_entity_type: Optional[str] = None
     
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+
+    def __post_init__(self) -> None:
+        self.interested_topics = normalize_interested_topics(self.interested_topics)
     
     def to_reddit_format(self) -> Dict[str, Any]:
         """Chuyen sang dinh dang Reddit."""
@@ -162,7 +235,7 @@ class OasisProfileGenerator:
     # Danh sach quoc gia pho bien
     COUNTRIES = [
         "Trung Quốc", "Hoa Kỳ", "Vương quốc Anh", "Nhật Bản", "Đức", "Pháp",
-        "Canada", "Australia", "Brazil", "Ấn Độ", "Hàn Quốc"
+        "Canada", "Australia", "Brazil", "Ấn Độ", "Hàn Quốc", "Việt Nam"
     ]
     
     # Nhom thuc the ca nhan can tao persona cu the
@@ -194,7 +267,8 @@ class OasisProfileGenerator:
         
         self.client = OpenAI(
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=Config.LLM_TIMEOUT_SECONDS,
         )
         
         # Client Zep dung de truy xuat ngu canh phong phu hon
@@ -526,16 +600,18 @@ class OasisProfileGenerator:
         
         for attempt in range(max_attempts):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
+                request_kwargs = sanitize_llm_payload({
+                    "model": self.model_name,
+                    "messages": [
                         {"role": "system", "content": self._get_system_prompt(is_individual)},
                         {"role": "user", "content": prompt}
                     ],
-                    response_format={"type": "json_object"},
-                    temperature=0.7 - (attempt * 0.1)  # Giam nhiet do sau moi lan thu lai
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.7 - (attempt * 0.1),  # Giam nhiet do sau moi lan thu lai
+                    "timeout": Config.LLM_TIMEOUT_SECONDS,
                     # Khong dat max_tokens de LLM tu quyet dinh do dai phan hoi
-                )
+                })
+                response = self.client.chat.completions.create(**request_kwargs)
                 
                 content = response.choices[0].message.content
                 
@@ -569,11 +645,15 @@ class OasisProfileGenerator:
                     last_error = je
                     
             except Exception as e:
+                if is_unrecoverable_llm_request_error(e):
+                    logger.error(f"Goi LLM gap loi request khong the phuc hoi, chuyen sang tao theo luat: {e}")
+                    last_error = e
+                    break
                 logger.warning(f"Goi LLM that bai (lan {attempt+1}): {str(e)[:80]}")
                 last_error = e
                 import time
                 time.sleep(1 * (attempt + 1))  # Backoff tang dan
-        
+
         logger.warning(f"Tao persona bang LLM that bai sau {max_attempts} lan thu: {last_error}, chuyen sang tao theo luat")
         return self._generate_profile_rule_based(
             entity_name, entity_type, entity_summary, entity_attributes
@@ -901,18 +981,13 @@ Lưu ý quan trọng:
                     if output_platform == "reddit":
                         # Dinh dang JSON cho Reddit
                         profiles_data = [p.to_reddit_format() for p in existing_profiles]
-                        with open(realtime_output_path, 'w', encoding='utf-8') as f:
-                            json.dump(profiles_data, f, ensure_ascii=False, indent=2)
+                        _atomic_write_json(realtime_output_path, profiles_data)
                     else:
                         # Dinh dang CSV cho Twitter
-                        import csv
                         profiles_data = [p.to_twitter_format() for p in existing_profiles]
                         if profiles_data:
                             fieldnames = list(profiles_data[0].keys())
-                            with open(realtime_output_path, 'w', encoding='utf-8', newline='') as f:
-                                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                                writer.writeheader()
-                                writer.writerows(profiles_data)
+                            _atomic_write_csv(realtime_output_path, profiles_data, fieldnames)
                 except Exception as e:
                     logger.warning(f"Luu profile theo thoi gian thuc that bai: {e}")
         
@@ -988,6 +1063,9 @@ Lưu ý quan trọng:
                         logger.info(f"[{current}/{total}] Tạo hồ sơ thành công: {entity.name} ({entity_type})")
                         
                 except Exception as e:
+                    if is_unrecoverable_llm_request_error(e):
+                        logger.error(f"Dung toan bo qua trinh tao profile vi loi request LLM khong the phuc hoi: {e}")
+                        raise
                     logger.error(f"Xay ra loi khi xu ly thuc the {entity.name}: {str(e)}")
                     with lock:
                         completed_count[0] += 1

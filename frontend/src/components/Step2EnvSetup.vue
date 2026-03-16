@@ -725,6 +725,65 @@ const getAgentUsername = (agentId) => {
   return `agent_${agentId}`
 }
 
+const normalizeInterestedTopics = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map(topic => String(topic || '').trim())
+      .filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!text) {
+      return []
+    }
+
+    let normalizedText = text
+
+    if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('(') && text.endsWith(')'))) {
+      try {
+        const parsed = JSON.parse(text)
+        if (Array.isArray(parsed)) {
+          return normalizeInterestedTopics(parsed)
+        }
+      } catch (err) {
+        normalizedText = text.slice(1, -1)
+      }
+    }
+
+    if (/[,\n;|]/.test(normalizedText)) {
+      return normalizedText
+        .split(/[\n,;|]+/)
+        .map(topic => topic.trim().replace(/^['"]+|['"]+$/g, ''))
+        .filter(Boolean)
+    }
+
+    normalizedText = normalizedText.replace(/^['"]+|['"]+$/g, '')
+    return normalizedText ? [normalizedText] : []
+  }
+
+  return []
+}
+
+const normalizeProfile = (profile) => {
+  if (!profile || typeof profile !== 'object') {
+    return profile
+  }
+
+  return {
+    ...profile,
+    interested_topics: normalizeInterestedTopics(profile.interested_topics)
+  }
+}
+
+const normalizeProfiles = (items) => {
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items.map(normalizeProfile)
+}
+
 // Calculate the total number of linked topics across all personas
 const totalTopicsCount = computed(() => {
   return profiles.value.reduce((sum, p) => {
@@ -762,7 +821,7 @@ const truncateBio = (bio) => {
 }
 
 const selectProfile = (profile) => {
-  selectedProfile.value = profile
+  selectedProfile.value = normalizeProfile(profile)
 }
 
 // Automatically start preparing the simulation
@@ -913,7 +972,7 @@ const fetchProfilesRealtime = async () => {
     
     if (res.success && res.data) {
       const prevCount = profiles.value.length
-      profiles.value = res.data.profiles || []
+      profiles.value = normalizeProfiles(res.data.profiles)
       // Update only when the API returns a valid value so existing valid data is not overwritten
       if (res.data.total_expected) {
         expectedTotal.value = res.data.total_expected

@@ -392,7 +392,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAgentLog, getConsoleLog } from '../api/report'
+import { getAgentLog, getConsoleLog, getReport } from '../api/report'
 
 const router = useRouter()
 
@@ -2034,9 +2034,74 @@ const getLogLevelClass = (log) => {
 // Polling
 let agentLogTimer = null
 let consoleLogTimer = null
+let isFetchingAgentLog = false
+let isFetchingConsoleLog = false
+let isSyncingReportState = false
+let idleAgentLogPolls = 0
+
+const AGENT_LOG_IDLE_LIMIT = 3
+
+const applyTerminalReportState = (status, reportData = null) => {
+  if (reportData?.outline && !reportOutline.value) {
+    reportOutline.value = reportData.outline
+  }
+
+  if (status === 'completed') {
+    isComplete.value = true
+    currentSectionIndex.value = null
+    emit('update-status', 'completed')
+    stopPolling()
+    return true
+  }
+
+  if (status === 'failed') {
+    currentSectionIndex.value = null
+    emit('update-status', 'error')
+    stopPolling()
+    return true
+  }
+
+  return false
+}
+
+const syncReportState = async () => {
+  if (!props.reportId || isSyncingReportState) return false
+
+  try {
+    isSyncingReportState = true
+    const res = await getReport(props.reportId)
+
+    if (res.success && res.data) {
+      return applyTerminalReportState(res.data.status, res.data)
+    }
+  } catch (err) {
+    console.warn('Failed to sync report state:', err)
+  } finally {
+    isSyncingReportState = false
+  }
+
+  return false
+}
+
+const handlePollingFailure = (err, sourceLabel) => {
+  const errorCode = err?.response?.data?.code
+  const errorMessage = err?.response?.data?.error || err?.message || `Failed to fetch ${sourceLabel}`
+
+  if (errorCode === 'report_stalled') {
+    addLog(`Report polling stopped: ${errorMessage}`)
+    currentSectionIndex.value = null
+    emit('update-status', 'error')
+    stopPolling()
+    return true
+  }
+
+  return false
+}
 
 const fetchAgentLog = async () => {
-  if (!props.reportId) return
+  if (!props.reportId || isFetchingAgentLog) return
+
+  isFetchingAgentLog = true
   
   try {
     const res = await getAgentLog(props.reportId, agentLogLine.value)
@@ -2045,6 +2110,8 @@ const fetchAgentLog = async () => {
       const newLogs = res.data.logs || []
       
       if (newLogs.length > 0) {
+        idleAgentLogPolls = 0
+
         newLogs.forEach(log => {
           agentLogs.value.push(log)
           
@@ -2073,6 +2140,12 @@ const fetchAgentLog = async () => {
             stopPolling()
             // Handle scrolling in one place inside nextTick after the loop finishes
           }
+
+          if (log.action === 'error' && log.stage === 'failed') {
+            currentSectionIndex.value = null
+            emit('update-status', 'error')
+            stopPolling()
+          }
           
           if (log.action === 'report_start') {
             startTime.value = new Date(log.timestamp)
@@ -2091,10 +2164,22 @@ const fetchAgentLog = async () => {
             }
           }
         })
+      } else if ((res.data.total_lines || 0) <= agentLogLine.value) {
+        idleAgentLogPolls += 1
+
+        if (idleAgentLogPolls >= AGENT_LOG_IDLE_LIMIT) {
+          const isTerminal = await syncReportState()
+          if (!isTerminal) {
+            idleAgentLogPolls = 0
+          }
+        }
       }
     }
   } catch (err) {
+    if (handlePollingFailure(err, 'agent log')) return
     console.warn('Failed to fetch agent log:', err)
+  } finally {
+    isFetchingAgentLog = false
   }
 }
 
@@ -2144,7 +2229,9 @@ const extractFinalContent = (response) => {
 }
 
 const fetchConsoleLog = async () => {
-  if (!props.reportId) return
+  if (!props.reportId || isFetchingConsoleLog) return
+
+  isFetchingConsoleLog = true
   
   try {
     const res = await getConsoleLog(props.reportId, consoleLogLine.value)
@@ -2164,12 +2251,17 @@ const fetchConsoleLog = async () => {
       }
     }
   } catch (err) {
+    if (handlePollingFailure(err, 'console log')) return
     console.warn('Failed to fetch console log:', err)
+  } finally {
+    isFetchingConsoleLog = false
   }
 }
 
 const startPolling = () => {
   if (agentLogTimer || consoleLogTimer) return
+
+  idleAgentLogPolls = 0
   
   fetchAgentLog()
   fetchConsoleLog()
@@ -2187,6 +2279,8 @@ const stopPolling = () => {
     clearInterval(consoleLogTimer)
     consoleLogTimer = null
   }
+
+  idleAgentLogPolls = 0
 }
 
 // Lifecycle
@@ -2203,6 +2297,7 @@ onUnmounted(() => {
 
 watch(() => props.reportId, (newId) => {
   if (newId) {
+    stopPolling()
     agentLogs.value = []
     consoleLogs.value = []
     agentLogLine.value = 0

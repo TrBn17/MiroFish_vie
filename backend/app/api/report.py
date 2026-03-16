@@ -3,6 +3,7 @@
 import os
 import traceback
 import threading
+from datetime import datetime
 from flask import request, jsonify, send_file
 
 from . import report_bp
@@ -14,6 +15,82 @@ from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
 
 logger = get_logger('mirofish.api.report')
+
+
+def _find_active_report_task_id(report_id: str):
+    """Find the active report-generation task bound to a report ID."""
+    task_manager = TaskManager()
+    for task in task_manager.list_tasks(task_type="report_generate"):
+        metadata = task.get("metadata") or {}
+        if (
+            metadata.get("report_id") == report_id
+            and task.get("status") in {TaskStatus.PENDING.value, TaskStatus.PROCESSING.value}
+        ):
+            return task.get("task_id")
+    return None
+
+
+def _mark_report_failed(report_id: str, error_message: str) -> None:
+    """Persist a failed report/task state when generation is stalled."""
+    report = ReportManager.get_report(report_id)
+    if report and report.status not in {ReportStatus.COMPLETED, ReportStatus.FAILED}:
+        report.status = ReportStatus.FAILED
+        report.error = error_message
+        report.completed_at = datetime.now().isoformat()
+        ReportManager.save_report(report)
+
+    progress_data = ReportManager.get_progress(report_id) or {}
+    try:
+        ReportManager.update_progress(
+            report_id,
+            "failed",
+            -1,
+            error_message,
+            current_section=None,
+            completed_sections=progress_data.get("completed_sections", []),
+        )
+    except Exception:
+        pass
+
+    task_id = _find_active_report_task_id(report_id)
+    if task_id:
+        TaskManager().fail_task(task_id, error_message)
+
+
+def _detect_stalled_report(report_id: str):
+    """Return an error message if the report is stalled long enough to be considered failed."""
+    report = ReportManager.get_report(report_id)
+    if not report or report.status in {ReportStatus.COMPLETED, ReportStatus.FAILED}:
+        return None
+
+    progress_data = ReportManager.get_progress(report_id)
+    if not progress_data:
+        return None
+
+    progress_status = progress_data.get("status")
+    if progress_status in {"completed", "failed"}:
+        return None
+
+    updated_at_raw = progress_data.get("updated_at")
+    if not updated_at_raw:
+        return None
+
+    try:
+        updated_at = datetime.fromisoformat(updated_at_raw)
+    except ValueError:
+        return None
+
+    stalled_seconds = (datetime.now() - updated_at).total_seconds()
+    if stalled_seconds < Config.REPORT_STALL_TIMEOUT_SECONDS:
+        return None
+
+    error_message = (
+        f"Report generation stalled: no progress/log updates for "
+        f"{int(stalled_seconds)}s while status is '{progress_status}'."
+    )
+    logger.error(error_message)
+    _mark_report_failed(report_id, error_message)
+    return error_message
 
 
 # ============== Report generation APIs ==============
@@ -286,6 +363,7 @@ def get_report(report_id: str):
         }
     """
     try:
+        _detect_stalled_report(report_id)
         report = ReportManager.get_report(report_id)
         
         if not report:
@@ -791,6 +869,15 @@ def get_agent_log(report_id: str):
         from_line = request.args.get('from_line', 0, type=int)
         
         log_data = ReportManager.get_agent_log(report_id, from_line=from_line)
+
+        if not log_data.get("logs") and from_line >= log_data.get("total_lines", 0):
+            stall_error = _detect_stalled_report(report_id)
+            if stall_error:
+                return jsonify({
+                    "success": False,
+                    "error": stall_error,
+                    "code": "report_stalled"
+                }), 409
         
         return jsonify({
             "success": True,
@@ -872,6 +959,15 @@ def get_console_log(report_id: str):
         from_line = request.args.get('from_line', 0, type=int)
         
         log_data = ReportManager.get_console_log(report_id, from_line=from_line)
+
+        if not log_data.get("logs") and from_line >= log_data.get("total_lines", 0):
+            stall_error = _detect_stalled_report(report_id)
+            if stall_error:
+                return jsonify({
+                    "success": False,
+                    "error": stall_error,
+                    "code": "report_stalled"
+                }), 409
         
         return jsonify({
             "success": True,

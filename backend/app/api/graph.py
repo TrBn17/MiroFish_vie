@@ -12,6 +12,7 @@ from ..services.graph_builder import GraphBuilderService
 from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
+from ..utils.zep_paging import get_retry_after_seconds, is_rate_limit_error
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
@@ -244,6 +245,16 @@ def generate_ontology():
         })
         
     except Exception as e:
+        if is_rate_limit_error(e):
+            response = {
+                "success": False,
+                "error": str(e),
+            }
+            retry_after_seconds = get_retry_after_seconds(e)
+            if retry_after_seconds is not None:
+                response["retry_after"] = int(retry_after_seconds)
+            return jsonify(response), 429
+
         return jsonify({
             "success": False,
             "error": str(e),
@@ -451,7 +462,7 @@ def build_graph():
                         progress=progress
                     )
                 
-                builder._wait_for_episodes(episode_uuids, wait_progress_callback)
+                builder._wait_for_episodes(graph_id, episode_uuids, wait_progress_callback)
                 
                 # Lấy dữ liệu đồ thị
                 task_manager.update_task(
@@ -514,6 +525,16 @@ def build_graph():
         })
         
     except Exception as e:
+        if is_rate_limit_error(e):
+            response = {
+                "success": False,
+                "error": str(e),
+            }
+            retry_after_seconds = get_retry_after_seconds(e)
+            if retry_after_seconds is not None:
+                response["retry_after"] = int(retry_after_seconds)
+            return jsonify(response), 429
+
         return jsonify({
             "success": False,
             "error": str(e),
@@ -579,6 +600,16 @@ def get_graph_data(graph_id: str):
         })
         
     except Exception as e:
+        if is_rate_limit_error(e):
+            response = {
+                "success": False,
+                "error": str(e),
+            }
+            retry_after_seconds = get_retry_after_seconds(e)
+            if retry_after_seconds is not None:
+                response["retry_after"] = int(retry_after_seconds)
+            return jsonify(response), 429
+
         return jsonify({
             "success": False,
             "error": str(e),

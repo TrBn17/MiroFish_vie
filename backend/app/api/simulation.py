@@ -2,12 +2,13 @@
 
 import os
 import traceback
+from typing import Any, Dict, List
 from flask import request, jsonify, send_file
 
 from . import simulation_bp
 from ..config import Config
 from ..services.zep_entity_reader import ZepEntityReader
-from ..services.oasis_profile_generator import OasisProfileGenerator
+from ..services.oasis_profile_generator import OasisProfileGenerator, normalize_interested_topics
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..utils.logger import get_logger
@@ -19,6 +20,24 @@ logger = get_logger('mirofish.api.simulation')
 # Interview prompt prefix
 # This prefix nudges the agent to reply directly in text instead of calling tools.
 INTERVIEW_PROMPT_PREFIX = "Based on your persona, complete memory, and past actions, reply directly in text without calling any tools: "
+
+
+def _normalize_profiles_interested_topics(profiles: Any) -> List[Dict[str, Any]]:
+    """Normalize topic payloads before returning profile data to the UI."""
+    if not isinstance(profiles, list):
+        return []
+
+    normalized_profiles: List[Dict[str, Any]] = []
+    for profile in profiles:
+        if not isinstance(profile, dict):
+            continue
+        normalized_profile = dict(profile)
+        normalized_profile["interested_topics"] = normalize_interested_topics(
+            profile.get("interested_topics")
+        )
+        normalized_profiles.append(normalized_profile)
+
+    return normalized_profiles
 
 
 def optimize_interview_prompt(prompt: str) -> str:
@@ -991,7 +1010,9 @@ def get_simulation_profiles(simulation_id: str):
         platform = request.args.get('platform', 'reddit')
         
         manager = SimulationManager()
-        profiles = manager.get_profiles(simulation_id, platform=platform)
+        profiles = _normalize_profiles_interested_topics(
+            manager.get_profiles(simulation_id, platform=platform)
+        )
         
         return jsonify({
             "success": True,
@@ -1047,6 +1068,7 @@ def get_simulation_profiles_realtime(simulation_id: str):
     """
     import json
     import csv
+    import time
     from datetime import datetime
     
     try:
@@ -1077,17 +1099,26 @@ def get_simulation_profiles_realtime(simulation_id: str):
             file_stat = os.stat(profiles_file)
             file_modified_at = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
             
-            try:
-                if platform == "reddit":
-                    with open(profiles_file, 'r', encoding='utf-8') as f:
-                        profiles = json.load(f)
-                else:
-                    with open(profiles_file, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        profiles = list(reader)
-            except (json.JSONDecodeError, Exception) as e:
-                logger.warning(f"Doc tep profiles that bai (co the dang duoc ghi): {e}")
-                profiles = []
+            read_error = None
+            for attempt in range(3):
+                try:
+                    if platform == "reddit":
+                        with open(profiles_file, 'r', encoding='utf-8') as f:
+                            profiles = json.load(f)
+                    else:
+                        with open(profiles_file, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            profiles = list(reader)
+                    profiles = _normalize_profiles_interested_topics(profiles)
+                    read_error = None
+                    break
+                except (json.JSONDecodeError, Exception) as e:
+                    read_error = e
+                    if attempt < 2:
+                        time.sleep(0.05)
+                    else:
+                        logger.warning(f"Doc tep profiles that bai (co the dang duoc ghi): {e}")
+                        profiles = []
         
         # Kiem tra co dang sinh hay khong (dua tren state.json)
         is_generating = False

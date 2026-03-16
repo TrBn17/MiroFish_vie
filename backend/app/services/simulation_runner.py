@@ -1282,80 +1282,80 @@ class SimulationRunner:
     @classmethod
     def register_cleanup(cls):
         """
-        注册清理函数
+        Đăng ký hàm dọn dẹp
         
-        在 Flask 应用启动时调用，确保服务器关闭时清理所有模拟进程
+        Được gọi khi ứng dụng Flask khởi động, đảm bảo khi server tắt sẽ dọn mọi tiến trình mô phỏng
         """
         global _cleanup_registered
         
         if _cleanup_registered:
             return
         
-        # Flask debug 模式下，只在 reloader 子进程中注册清理（实际运行应用的进程）
-        # WERKZEUG_RUN_MAIN=true 表示是 reloader 子进程
-        # 如果不是 debug 模式，则没有这个环境变量，也需要注册
+        # Trong chế độ debug của Flask, chỉ đăng ký dọn dẹp trong tiến trình con reloader
+        # WERKZEUG_RUN_MAIN=true nghĩa là tiến trình con reloader
+        # Nếu không phải debug mode thì biến môi trường này không có, nhưng vẫn cần đăng ký
         is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
         is_debug_mode = os.environ.get('FLASK_DEBUG') == '1' or os.environ.get('WERKZEUG_RUN_MAIN') is not None
         
-        # 在 debug 模式下，只在 reloader 子进程中注册；非 debug 模式下始终注册
+        # Trong debug mode, chỉ đăng ký ở tiến trình con reloader; ngoài debug mode thì luôn đăng ký
         if is_debug_mode and not is_reloader_process:
-            _cleanup_registered = True  # 标记已注册，防止子进程再次尝试
+            _cleanup_registered = True  # Đánh dấu đã đăng ký để tránh tiến trình con thử lại
             return
         
-        # 保存原有的信号处理器
+        # Lưu signal handler gốc
         original_sigint = signal.getsignal(signal.SIGINT)
         original_sigterm = signal.getsignal(signal.SIGTERM)
-        # SIGHUP 只在 Unix 系统存在（macOS/Linux），Windows 没有
+        # SIGHUP chỉ có trên Unix (macOS/Linux), Windows không có
         original_sighup = None
         has_sighup = hasattr(signal, 'SIGHUP')
         if has_sighup:
             original_sighup = signal.getsignal(signal.SIGHUP)
         
         def cleanup_handler(signum=None, frame=None):
-            """信号处理器：先清理模拟进程，再调用原处理器"""
-            # 只有在有进程需要清理时才打印日志
+            """Signal handler: dọn tiến trình mô phỏng trước, rồi gọi handler gốc"""
+            # Chỉ ghi log khi thật sự có tiến trình cần dọn
             if cls._processes or cls._graph_memory_enabled:
-                logger.info(f"收到信号 {signum}，开始清理...")
+                logger.info(f"Nhận tín hiệu {signum}, bắt đầu dọn dẹp...")
             cls.cleanup_all_simulations()
             
-            # 调用原有的信号处理器，让 Flask 正常退出
+            # Gọi signal handler gốc để Flask thoát bình thường
             if signum == signal.SIGINT and callable(original_sigint):
                 original_sigint(signum, frame)
             elif signum == signal.SIGTERM and callable(original_sigterm):
                 original_sigterm(signum, frame)
             elif has_sighup and signum == signal.SIGHUP:
-                # SIGHUP: 终端关闭时发送
+                # SIGHUP: được gửi khi terminal đóng
                 if callable(original_sighup):
                     original_sighup(signum, frame)
                 else:
-                    # 默认行为：正常退出
+                    # Hành vi mặc định: thoát bình thường
                     sys.exit(0)
             else:
-                # 如果原处理器不可调用（如 SIG_DFL），则使用默认行为
+                # Nếu handler gốc không thể gọi được (như SIG_DFL) thì dùng hành vi mặc định
                 raise KeyboardInterrupt
         
-        # 注册 atexit 处理器（作为备用）
+        # Đăng ký handler atexit (dự phòng)
         atexit.register(cls.cleanup_all_simulations)
         
-        # 注册信号处理器（仅在主线程中）
+        # Đăng ký signal handler (chỉ trong luồng chính)
         try:
-            # SIGTERM: kill 命令默认信号
+            # SIGTERM: tín hiệu mặc định của lệnh kill
             signal.signal(signal.SIGTERM, cleanup_handler)
             # SIGINT: Ctrl+C
             signal.signal(signal.SIGINT, cleanup_handler)
-            # SIGHUP: 终端关闭（仅 Unix 系统）
+            # SIGHUP: terminal đóng (chỉ trên Unix)
             if has_sighup:
                 signal.signal(signal.SIGHUP, cleanup_handler)
         except ValueError:
-            # 不在主线程中，只能使用 atexit
-            logger.warning("无法注册信号处理器（不在主线程），仅使用 atexit")
+            # Không ở luồng chính, chỉ có thể dùng atexit
+            logger.warning("Không thể đăng ký signal handler (không ở luồng chính), chỉ dùng atexit")
         
         _cleanup_registered = True
     
     @classmethod
     def get_running_simulations(cls) -> List[str]:
         """
-        获取所有正在运行的模拟ID列表
+        Lấy danh sách ID mô phỏng đang chạy
         """
         running = []
         for sim_id, process in cls._processes.items():
@@ -1363,18 +1363,18 @@ class SimulationRunner:
                 running.append(sim_id)
         return running
     
-    # ============== Interview 功能 ==============
+    # ============== Chức năng Interview ==============
     
     @classmethod
     def check_env_alive(cls, simulation_id: str) -> bool:
         """
-        检查模拟环境是否存活（可以接收Interview命令）
+        Kiểm tra môi trường mô phỏng còn hoạt động hay không (có thể nhận lệnh Interview)
 
         Args:
-            simulation_id: 模拟ID
+            simulation_id: ID mô phỏng
 
         Returns:
-            True 表示环境存活，False 表示环境已关闭
+            True nghĩa là môi trường còn hoạt động, False nghĩa là môi trường đã đóng
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
@@ -1386,13 +1386,13 @@ class SimulationRunner:
     @classmethod
     def get_env_status_detail(cls, simulation_id: str) -> Dict[str, Any]:
         """
-        获取模拟环境的详细状态信息
+        Lấy thông tin trạng thái chi tiết của môi trường mô phỏng
 
         Args:
-            simulation_id: 模拟ID
+            simulation_id: ID mô phỏng
 
         Returns:
-            状态详情字典，包含 status, twitter_available, reddit_available, timestamp
+            Dict trạng thái chi tiết, gồm status, twitter_available, reddit_available, timestamp
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         status_file = os.path.join(sim_dir, "env_status.json")
@@ -1429,35 +1429,35 @@ class SimulationRunner:
         timeout: float = 60.0
     ) -> Dict[str, Any]:
         """
-        采访单个Agent
+        Phỏng vấn một Agent
 
         Args:
-            simulation_id: 模拟ID
+            simulation_id: ID mô phỏng
             agent_id: Agent ID
-            prompt: 采访问题
-            platform: 指定平台（可选）
-                - "twitter": 只采访Twitter平台
-                - "reddit": 只采访Reddit平台
-                - None: 双平台模拟时同时采访两个平台，返回整合结果
-            timeout: 超时时间（秒）
+            prompt: Câu hỏi phỏng vấn
+            platform: Nền tảng chỉ định (tùy chọn)
+                - "twitter": Chỉ phỏng vấn trên Twitter
+                - "reddit": Chỉ phỏng vấn trên Reddit
+                - None: Khi mô phỏng hai nền tảng, phỏng vấn đồng thời cả hai và trả về kết quả tổng hợp
+            timeout: Thời gian timeout (giây)
 
         Returns:
-            采访结果字典
+            Dict kết quả phỏng vấn
 
         Raises:
-            ValueError: 模拟不存在或环境未运行
-            TimeoutError: 等待响应超时
+            ValueError: Mô phỏng không tồn tại hoặc môi trường chưa chạy
+            TimeoutError: Chờ phản hồi quá thời gian
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+            raise ValueError(f"Mô phỏng không tồn tại: {simulation_id}")
 
         ipc_client = SimulationIPCClient(sim_dir)
 
         if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+            raise ValueError(f"Môi trường mô phỏng chưa chạy hoặc đã đóng, không thể thực hiện Interview: {simulation_id}")
 
-        logger.info(f"发送Interview命令: simulation_id={simulation_id}, agent_id={agent_id}, platform={platform}")
+        logger.info(f"Gửi lệnh Interview: simulation_id={simulation_id}, agent_id={agent_id}, platform={platform}")
 
         response = ipc_client.send_interview(
             agent_id=agent_id,
@@ -1492,34 +1492,34 @@ class SimulationRunner:
         timeout: float = 120.0
     ) -> Dict[str, Any]:
         """
-        批量采访多个Agent
+        Phỏng vấn hàng loạt nhiều Agent
 
         Args:
-            simulation_id: 模拟ID
-            interviews: 采访列表，每个元素包含 {"agent_id": int, "prompt": str, "platform": str(可选)}
-            platform: 默认平台（可选，会被每个采访项的platform覆盖）
-                - "twitter": 默认只采访Twitter平台
-                - "reddit": 默认只采访Reddit平台
-                - None: 双平台模拟时每个Agent同时采访两个平台
-            timeout: 超时时间（秒）
+            simulation_id: ID mô phỏng
+            interviews: Danh sách phỏng vấn, mỗi phần tử gồm {"agent_id": int, "prompt": str, "platform": str(tùy chọn)}
+            platform: Nền tảng mặc định (tùy chọn, sẽ bị platform của từng mục ghi đè)
+                - "twitter": Mặc định chỉ phỏng vấn Twitter
+                - "reddit": Mặc định chỉ phỏng vấn Reddit
+                - None: Khi mô phỏng hai nền tảng, mỗi Agent được phỏng vấn đồng thời trên cả hai
+            timeout: Thời gian timeout (giây)
 
         Returns:
-            批量采访结果字典
+            Dict kết quả phỏng vấn hàng loạt
 
         Raises:
-            ValueError: 模拟不存在或环境未运行
-            TimeoutError: 等待响应超时
+            ValueError: Mô phỏng không tồn tại hoặc môi trường chưa chạy
+            TimeoutError: Chờ phản hồi quá thời gian
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+            raise ValueError(f"Mô phỏng không tồn tại: {simulation_id}")
 
         ipc_client = SimulationIPCClient(sim_dir)
 
         if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+            raise ValueError(f"Môi trường mô phỏng chưa chạy hoặc đã đóng, không thể thực hiện Interview: {simulation_id}")
 
-        logger.info(f"发送批量Interview命令: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
+        logger.info(f"Gửi lệnh Interview hàng loạt: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
 
         response = ipc_client.send_batch_interview(
             interviews=interviews,
@@ -1551,39 +1551,39 @@ class SimulationRunner:
         timeout: float = 180.0
     ) -> Dict[str, Any]:
         """
-        采访所有Agent（全局采访）
+        Phỏng vấn tất cả Agent (phỏng vấn toàn cục)
 
-        使用相同的问题采访模拟中的所有Agent
+        Dùng cùng một câu hỏi để phỏng vấn tất cả Agent trong mô phỏng
 
         Args:
-            simulation_id: 模拟ID
-            prompt: 采访问题（所有Agent使用相同问题）
-            platform: 指定平台（可选）
-                - "twitter": 只采访Twitter平台
-                - "reddit": 只采访Reddit平台
-                - None: 双平台模拟时每个Agent同时采访两个平台
-            timeout: 超时时间（秒）
+            simulation_id: ID mô phỏng
+            prompt: Câu hỏi phỏng vấn (mọi Agent dùng cùng một câu hỏi)
+            platform: Nền tảng chỉ định (tùy chọn)
+                - "twitter": Chỉ phỏng vấn trên Twitter
+                - "reddit": Chỉ phỏng vấn trên Reddit
+                - None: Khi mô phỏng hai nền tảng, mỗi Agent được phỏng vấn đồng thời trên cả hai
+            timeout: Thời gian timeout (giây)
 
         Returns:
-            全局采访结果字典
+            Dict kết quả phỏng vấn toàn cục
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+            raise ValueError(f"Mô phỏng không tồn tại: {simulation_id}")
 
-        # 从配置文件获取所有Agent信息
+        # Lấy thông tin tất cả Agent từ file cấu hình
         config_path = os.path.join(sim_dir, "simulation_config.json")
         if not os.path.exists(config_path):
-            raise ValueError(f"模拟配置不存在: {simulation_id}")
+            raise ValueError(f"Cấu hình mô phỏng không tồn tại: {simulation_id}")
 
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
         agent_configs = config.get("agent_configs", [])
         if not agent_configs:
-            raise ValueError(f"模拟配置中没有Agent: {simulation_id}")
+            raise ValueError(f"Cấu hình mô phỏng không có Agent: {simulation_id}")
 
-        # 构建批量采访列表
+        # Tạo danh sách phỏng vấn hàng loạt
         interviews = []
         for agent_config in agent_configs:
             agent_id = agent_config.get("agent_id")
@@ -1593,7 +1593,7 @@ class SimulationRunner:
                     "prompt": prompt
                 })
 
-        logger.info(f"发送全局Interview命令: simulation_id={simulation_id}, agent_count={len(interviews)}, platform={platform}")
+        logger.info(f"Gửi lệnh Interview toàn cục: simulation_id={simulation_id}, agent_count={len(interviews)}, platform={platform}")
 
         return cls.interview_agents_batch(
             simulation_id=simulation_id,
@@ -1609,45 +1609,45 @@ class SimulationRunner:
         timeout: float = 30.0
     ) -> Dict[str, Any]:
         """
-        关闭模拟环境（而不是停止模拟进程）
+        Đóng môi trường mô phỏng (không phải dừng tiến trình mô phỏng)
         
-        向模拟发送关闭环境命令，使其优雅退出等待命令模式
+        Gửi lệnh đóng môi trường để mô phỏng thoát khỏi chế độ chờ lệnh một cách nhẹ nhàng
         
         Args:
-            simulation_id: 模拟ID
-            timeout: 超时时间（秒）
+            simulation_id: ID mô phỏng
+            timeout: Thời gian timeout (giây)
             
         Returns:
-            操作结果字典
+            Dict kết quả thao tác
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+            raise ValueError(f"Mô phỏng không tồn tại: {simulation_id}")
         
         ipc_client = SimulationIPCClient(sim_dir)
         
         if not ipc_client.check_env_alive():
             return {
                 "success": True,
-                "message": "环境已经关闭"
+                "message": "Môi trường đã đóng"
             }
         
-        logger.info(f"发送关闭环境命令: simulation_id={simulation_id}")
+        logger.info(f"Gửi lệnh đóng môi trường: simulation_id={simulation_id}")
         
         try:
             response = ipc_client.send_close_env(timeout=timeout)
             
             return {
                 "success": response.status.value == "completed",
-                "message": "环境关闭命令已发送",
+                "message": "Đã gửi lệnh đóng môi trường",
                 "result": response.result,
                 "timestamp": response.timestamp
             }
         except TimeoutError:
-            # 超时可能是因为环境正在关闭
+            # Timeout có thể do môi trường đang đóng
             return {
                 "success": True,
-                "message": "环境关闭命令已发送（等待响应超时，环境可能正在关闭）"
+                "message": "Đã gửi lệnh đóng môi trường (chờ phản hồi quá thời gian, môi trường có thể đang đóng)"
             }
     
     @classmethod
@@ -1658,7 +1658,7 @@ class SimulationRunner:
         agent_id: Optional[int] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
-        """从单个数据库获取Interview历史"""
+        """Lấy lịch sử Interview từ một database"""
         import sqlite3
         
         if not os.path.exists(db_path):
@@ -1704,7 +1704,7 @@ class SimulationRunner:
             conn.close()
             
         except Exception as e:
-            logger.error(f"读取Interview历史失败 ({platform_name}): {e}")
+            logger.error(f"Đọc lịch sử Interview thất bại ({platform_name}): {e}")
         
         return results
 
@@ -1717,29 +1717,29 @@ class SimulationRunner:
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
-        获取Interview历史记录（从数据库读取）
+        Lấy lịch sử Interview (đọc từ database)
         
         Args:
-            simulation_id: 模拟ID
-            platform: 平台类型（reddit/twitter/None）
-                - "reddit": 只获取Reddit平台的历史
-                - "twitter": 只获取Twitter平台的历史
-                - None: 获取两个平台的所有历史
-            agent_id: 指定Agent ID（可选，只获取该Agent的历史）
-            limit: 每个平台返回数量限制
+            simulation_id: ID mô phỏng
+            platform: Loại nền tảng (reddit/twitter/None)
+                - "reddit": Chỉ lấy lịch sử của Reddit
+                - "twitter": Chỉ lấy lịch sử của Twitter
+                - None: Lấy toàn bộ lịch sử của cả hai nền tảng
+            agent_id: Chỉ định Agent ID (tùy chọn, chỉ lấy lịch sử của Agent đó)
+            limit: Giới hạn số lượng trả về cho mỗi nền tảng
             
         Returns:
-            Interview历史记录列表
+            Danh sách lịch sử Interview
         """
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         
         results = []
         
-        # 确定要查询的平台
+        # Xác định nền tảng cần truy vấn
         if platform in ("reddit", "twitter"):
             platforms = [platform]
         else:
-            # 不指定platform时，查询两个平台
+            # Nếu không chỉ định platform thì truy vấn cả hai nền tảng
             platforms = ["twitter", "reddit"]
         
         for p in platforms:
@@ -1752,10 +1752,10 @@ class SimulationRunner:
             )
             results.extend(platform_results)
         
-        # 按时间降序排序
+        # Sắp xếp theo thời gian giảm dần
         results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         
-        # 如果查询了多个平台，限制总数
+        # Nếu truy vấn nhiều nền tảng thì giới hạn tổng số
         if len(platforms) > 1 and len(results) > limit:
             results = results[:limit]
         

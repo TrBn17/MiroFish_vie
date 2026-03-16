@@ -15,7 +15,7 @@ from zep_cloud import EpisodeData, EntityEdgeSourceTarget
 
 from ..config import Config
 from ..models.task import TaskManager, TaskStatus
-from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
+from ..utils.zep_paging import call_with_retry, fetch_all_nodes, fetch_all_edges
 from .text_processor import TextProcessor
 
 
@@ -155,6 +155,7 @@ class GraphBuilderService:
             )
             
             self._wait_for_episodes(
+                graph_id,
                 episode_uuids,
                 lambda msg, prog: self.task_manager.update_task(
                     task_id,
@@ -316,9 +317,11 @@ class GraphBuilderService:
             
             # Gui den Zep
             try:
-                batch_result = self.client.graph.add_batch(
+                batch_result = call_with_retry(
+                    self.client.graph.add_batch,
                     graph_id=graph_id,
-                    episodes=episodes
+                    episodes=episodes,
+                    operation_description=f"add episode batch {batch_num}/{total_batches} (graph={graph_id})",
                 )
                 
                 # Thu thap episode uuid duoc tra ve
@@ -340,11 +343,13 @@ class GraphBuilderService:
     
     def _wait_for_episodes(
         self,
+        graph_id: str,
         episode_uuids: List[str],
         progress_callback: Optional[Callable] = None,
-        timeout: int = 600
+        timeout: int = 600,
+        poll_interval: float = 12.0
     ):
-        """Cho tat ca episode duoc xu ly xong (bang cach kiem tra trang thai processed cua tung episode)"""
+        """Cho tat ca episode duoc xu ly xong bang cach kiem tra danh sach episode cua graph."""
         if not episode_uuids:
             if progress_callback:
                 progress_callback("Khong can cho (khong co episode)", 1.0)
@@ -367,19 +372,22 @@ class GraphBuilderService:
                     )
                 break
             
-            # Kiem tra trang thai xu ly cua tung episode
-            for ep_uuid in list(pending_episodes):
-                try:
-                    episode = self.client.graph.episode.get(uuid_=ep_uuid)
-                    is_processed = getattr(episode, 'processed', False)
-                    
-                    if is_processed:
-                        pending_episodes.remove(ep_uuid)
-                        completed_count += 1
-                        
-                except Exception as e:
-                    # Bo qua loi truy van don le va tiep tuc
-                    pass
+            # Doc theo graph thay vi truy van tung episode de giam nguy co vuot han muc.
+            episode_response = call_with_retry(
+                self.client.graph.episode.get_by_graph_id,
+                graph_id,
+                lastn=total_episodes,
+                operation_description=f"poll episode processing status (graph={graph_id})",
+            )
+
+            processed_episode_uuids = {
+                getattr(episode, 'uuid_', None) or getattr(episode, 'uuid', None)
+                for episode in (getattr(episode_response, 'episodes', None) or [])
+                if getattr(episode, 'processed', False)
+            }
+
+            pending_episodes -= {uuid for uuid in processed_episode_uuids if uuid in pending_episodes}
+            completed_count = total_episodes - len(pending_episodes)
             
             elapsed = int(time.time() - start_time)
             if progress_callback:
@@ -389,7 +397,7 @@ class GraphBuilderService:
                 )
             
             if pending_episodes:
-                time.sleep(3)  # Kiem tra mot lan moi 3 giay
+                time.sleep(poll_interval)
         
         if progress_callback:
             progress_callback(f"Xu ly hoan tat: {completed_count}/{total_episodes}", 1.0)
